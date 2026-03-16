@@ -1807,19 +1807,35 @@ function startMusic(type) {
       const wasOpen = drop.classList.contains('open');
       closeAll();
       if (!wasOpen) {
-        // 버튼 위치 기준으로 드롭다운 좌표 계산
         const rect = btn.getBoundingClientRect();
-        // 드롭다운 너비는 버튼과 동일
-        drop.style.width  = rect.width + 'px';
-        drop.style.left   = rect.left + 'px';
-        // 일단 열어서 실제 높이 측정
+        const vw   = window.innerWidth;
+        const vh   = window.innerHeight;
+
+        // 1) 너비 먼저 지정 후 화면 밖 임시 위치에서 열어 실제 높이 측정
+        drop.style.width    = rect.width + 'px';
+        drop.style.left     = '-9999px';
+        drop.style.top      = '0px';
+        drop.style.bottom   = '';
         drop.classList.add('open');
-        const dropH = drop.offsetHeight;
-        // 버튼 위쪽에 공간이 충분하면 위로, 아니면 아래로
-        if (rect.top - dropH - 6 >= 4) {
+        const dropH = drop.scrollHeight; // scrollHeight로 잘림 없는 전체 높이
+
+        // 2) 버튼 위/아래 가용 공간 계산
+        const spaceAbove = rect.top - 6;         // 버튼 위쪽 여백
+        const spaceBelow = vh - rect.bottom - 6; // 버튼 아래쪽 여백
+
+        // 3) 좌우: 화면 밖으로 삐져나가지 않게 clamp
+        let leftPos = rect.left;
+        if (leftPos + rect.width > vw - 4) leftPos = vw - rect.width - 4;
+        if (leftPos < 4) leftPos = 4;
+        drop.style.left = leftPos + 'px';
+
+        // 4) 위아래: 공간이 충분한 쪽으로, 둘 다 부족하면 위쪽 우선(더 넓음)
+        if (spaceAbove >= dropH || spaceAbove >= spaceBelow) {
+          // 버튼 위로 열기
           drop.style.top    = '';
-          drop.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+          drop.style.bottom = (vh - rect.top + 6) + 'px';
         } else {
+          // 버튼 아래로 열기
           drop.style.bottom = '';
           drop.style.top    = (rect.bottom + 6) + 'px';
         }
