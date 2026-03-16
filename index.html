@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Fantasy Kaleidoscope</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+
+    /* 캔버스: 전체 화면 고정, 가장 아래 레이어 */
+    #kc-wrap { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    #kc { display: block; width: 100%; height: 100%; }
+
+    #kc-label {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+      color: rgba(255,255,255,0.25); font-family: monospace; font-size: 10px;
+      letter-spacing: 2px; pointer-events: none; white-space: nowrap; z-index: 20;
+    }
+
+    /* ── 하단 컨트롤: 3열 그리드, 화면 아래 고정 ── */
+    #kc-ui {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+      background: rgba(0,0,0,0.82);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    /* 셀렉트 박스 */
+    .kselect {
+      width: 100%;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.9);
+      padding: 7px 4px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-family: monospace;
+      appearance: none; -webkit-appearance: none;
+      outline: none;
+      text-align: center;
+      cursor: pointer;
+      min-height: 34px;
+    }
+    .kselect option { background: #111; color: #fff; }
+
+    /* 슬라이더 래퍼: 레이블 + 슬라이더를 세로로 */
+    .slider-wrap {
+      width: 100%;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 4px 6px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      min-height: 34px; justify-content: center;
+    }
+    .slider-label {
+      font-family: monospace; font-size: 9px;
+      color: rgba(255,255,255,0.45); letter-spacing: 1px;
+    }
+    .kslider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 3px; border-radius: 2px;
+      background: rgba(255,255,255,0.25); outline: none; cursor: pointer;
+    }
+    .kslider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; cursor: pointer;
+    }
+    #vol-slider::-webkit-slider-thumb  { background: rgba(120,220,255,0.95); }
+    #trail-slider::-webkit-slider-thumb{ background: rgba(180,255,180,0.95); }
+
+    /* BURST 버튼: 그리드 1칸 차지 */
+    #btn-burst {
+      width: 100%; min-height: 34px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.22);
+      color: rgba(255,255,255,0.9);
+      border-radius: 10px;
+      font-size: 12px; font-family: monospace;
+      cursor: pointer; letter-spacing: 1px;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #btn-burst:active { background: rgba(255,255,255,0.22); }
+
+    /* 시작 오버레이 */
+    #start-overlay {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, rgba(10,5,30,0.97) 0%, rgba(0,0,0,0.99) 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 200; gap: 24px; cursor: pointer;
+      touch-action: manipulation;
+    }
+    #start-overlay .s-title {
+      font-family: monospace; font-size: 13px; letter-spacing: 5px;
+      color: rgba(255,255,255,0.35); text-transform: uppercase;
+    }
+    #start-overlay .s-btn {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 1px solid rgba(120,200,255,0.35);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; color: rgba(180,230,255,0.9);
+      box-shadow: 0 0 40px rgba(80,160,255,0.2);
+    }
+    #start-overlay .s-hint {
+      font-family: monospace; font-size: 11px; letter-spacing: 3px;
+      color: rgba(255,255,255,0.2);
+    }
+  </style>
+</head>
+<body>
+
+<div id="start-overlay">
+  <div class="s-title">Fantasy Kaleidoscope</div>
+  <div class="s-btn">▶</div>
+  <div class="s-hint">TAP TO START</div>
+</div>
+
+<div id="kc-wrap"><canvas id="kc"></canvas></div>
+<div id="kc-label">FANTASY KALEIDOSCOPE</div>
+
+<!-- 3열 2행 그리드 UI -->
+<div id="kc-ui">
+
+  <!-- 1행 -->
+  <select class="kselect" id="sel-mode">
+    <option value="0">CLASSIC</option>
+    <option value="1">SPIRAL</option>
+    <option value="2">AURORA</option>
+    <option value="3">CRYSTAL</option>
+    <option value="4">NOVA</option>
+    <option value="5">FLOWER</option>
+    <option value="6">WEB</option>
+    <option value="7">PULSE</option>
+    <option value="8">VORTEX</option>
+    <option value="9">PRISM</option>
+    <option value="10">GALAXY</option>
+    <option value="11">RIPPLE</option>
+    <option value="12">FRACTAL</option>
+  </select>
+
+  <select class="kselect" id="sel-cymatics">
+    <option value="-1">사이메틱스 OFF</option>
+    <option value="0">Chladni 기본</option>
+    <option value="1">원형 파동</option>
+    <option value="2">별형 공명</option>
+    <option value="3">격자 간섭</option>
+    <option value="4">리사주 망</option>
+    <option value="5">만다라 파동</option>
+    <option value="6">베셀 함수</option>
+    <option value="7">나선 정상파</option>
+  </select>
+
+  <select class="kselect" id="sel-palette">
+    <option value="0">네온 사이버</option>
+    <option value="1">오로라</option>
+    <option value="2">황금 불꽃</option>
+    <option value="3">딥 오션</option>
+    <option value="4">벚꽃</option>
+    <option value="5">레인보우</option>
+    <option value="6">용암</option>
+    <option value="7">에메랄드</option>
+    <option value="8">갤럭시</option>
+    <option value="9">선셋</option>
+    <option value="10">아이스</option>
+    <option value="11">독성</option>
+    <option value="12">로즈골드</option>
+    <option value="13">미드나이트</option>
+    <option value="14">캔디</option>
+  </select>
+
+  <!-- 2행 -->
+  <select class="kselect" id="sel-speed">
+    <option value="0.075">매우 느림</option>
+    <option value="0.15">느림</option>
+    <option value="0.25" selected>보통</option>
+    <option value="0.5">빠름</option>
+    <option value="0.75">매우 빠름</option>
+  </select>
+
+  <select class="kselect" id="sel-music">
+    <option value="universe">Universe</option>
+    <option value="space">Space Ambient</option>
+    <option value="calm" selected>Calming</option>
+    <option value="rain">Rain Forest</option>
+    <option value="crystal">Crystal Bowl</option>
+    <option value="dream">Dreamscape</option>
+    <option value="ocean">Deep Ocean</option>
+    <option value="chime">Wind Chime</option>
+    <option value="pure_crystal">맑은 크리스탈</option>
+    <option value="opera">Space Opera</option>
+  </select>
+
+  <button id="btn-burst">✦ BURST</button>
+
+  <!-- 3행: 슬라이더 2개 + 빈칸 -->
+  <div class="slider-wrap">
+    <span class="slider-label">♪ 볼륨</span>
+    <input type="range" class="kslider" id="vol-slider" min="0" max="100" value="60">
+  </div>
+
+  <div class="slider-wrap">
+    <span class="slider-label">잔상</span>
+    <input type="range" class="kslider" id="trail-slider" min="1" max="40" value="18">
+  </div>
+
+  <div></div><!-- 빈 셀 -->
+
+</div>
+
+<script>
+(function(){
+/* ═══════════════════════════════════════════════════════════
+   즉시실행함수(IIFE)로 감싸 전역 변수 오염 방지
+   모든 변수·함수가 이 스코프 안에서만 존재
+═══════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────
+   1. 상수 & 공유 상태
+   MODES: 시각 모드 이름 목록 (인덱스로 참조)
+   PALETTES: 색상 배열 모음 — 각 팔레트마다 6~7가지 색상
+─────────────────────────────────────────────────────────── */
+const MODES = [
+  'classic','spiral','aurora','crystal','nova',
+  'flower','web','pulse','vortex','prism','galaxy','ripple','fractal'
+];
+const PALETTES = [
+  ['#00F2FF','#FF007F','#7000FF','#00FF88','#FFD700','#FF4500','#FFFFFF'], // 네온 사이버
+  ['#00FFCC','#00BFFF','#7B2FBE','#FF6EC7','#ADFF2F','#FFFFFF'],          // 오로라
+  ['#FF8C00','#FFD700','#FF4500','#FFF8DC','#FF0066','#FFFACD'],          // 황금 불꽃
+  ['#00CED1','#1E90FF','#8A2BE2','#00FA9A','#E0FFFF','#4169E1'],          // 딥 오션
+  ['#FFB7C5','#FF69B4','#FF1493','#FFC0CB','#FFFFFF','#DDA0DD'],          // 벚꽃
+  ['#FF0000','#FF7700','#FFFF00','#00FF00','#0000FF','#8B00FF','#FFFFFF'],// 레인보우
+  ['#FF2200','#FF5500','#FF8800','#FFAA00','#CC3300','#FF1100','#FFD700'],// 용암
+  ['#00FF99','#00FFCC','#00E5FF','#00C853','#69FF47','#B9F6CA','#FFFFFF'],// 에메랄드
+  ['#1A0533','#6A0DAD','#C77DFF','#E0AAFF','#00B4D8','#FF6B9D','#FFFFFF'],// 갤럭시
+  ['#FF6B35','#F7C59F','#EFEFD0','#FF9F1C','#FFBF69','#E63946','#FFD166'],// 선셋
+  ['#A8DADC','#457B9D','#E0FBFC','#C9F0FF','#FFFFFF','#B8E0FF','#90E0EF'],// 아이스
+  ['#39FF14','#CCFF00','#00FF41','#76FF03','#B7FF00','#18FF6D','#FFFFFF'],// 독성
+  ['#B76E79','#E8B4B8','#F2D2D5','#D4956A','#EAC4BB','#C9A8B2','#FFFFFF'],// 로즈골드
+  ['#0D0D2B','#1A1A4E','#3D2B8E','#6A4FB6','#9B72CF','#C9A8FF','#FFFFFF'],// 미드나이트
+  ['#FF99CC','#FF66B2','#FF99FF','#CC99FF','#99CCFF','#FFFF99','#FF6699'],// 캔디
+];
+
+let currentPalette = 0; // 현재 선택된 팔레트 인덱스
+
+// 현재 팔레트 배열 반환 헬퍼
+function palette() { return PALETTES[currentPalette]; }
+
+// HEX 색상(#RRGGBB)을 rgba() 문자열로 변환
+// 그라디언트·shadowColor 등 투명도가 필요한 곳에 사용
+function hexToRgba(hex, a) {
+  const r=parseInt(hex.slice(1,3),16),
+        g=parseInt(hex.slice(3,5),16),
+        b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ───────────────────────────────────────────────────────────
+   2. 캔버스 초기화
+   canvas: 실제 픽셀을 그리는 HTML 요소
+   ctx: 2D 드로잉 컨텍스트 (drawRects, arcs, transforms 등)
+   W, H: 현재 창 크기 — resize() 때마다 갱신
+─────────────────────────────────────────────────────────── */
+const canvas = document.getElementById('kc');
+const ctx    = canvas.getContext('2d');
+let W, H;
+
+// 창 크기에 맞게 캔버스 해상도 재설정
+// innerWidth/innerHeight 사용 — 스마트폰 브라우저 주소창 포함 전체 뷰포트
+let centerX = 0, centerY = 0; // 만화경 중심 좌표 (메뉴 제외 영역의 정중앙)
+let visH = 0; // 메뉴를 제외한 실제 가시 높이
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  // 하단 UI 바 실제 높이를 측정해서 남은 영역의 중앙을 계산
+  const ui = document.getElementById('kc-ui');
+  const uiH = ui ? ui.getBoundingClientRect().height : 0;
+  visH    = H - uiH;           // 메뉴를 뺀 실제 가시 높이
+  centerX = W / 2;
+  centerY = visH / 2;          // 메뉴를 뺀 공간의 정중앙
+}
+
+/* ───────────────────────────────────────────────────────────
+   3. 전역 애니메이션 상태
+   time: 매 프레임 0.016씩 증가 — 사인파 계산에 사용
+   globalRot: 만화경 전체 회전 누적값 (라디안)
+   speedMultiplier: UI 속도 셀렉트에 의해 제어되는 배속
+   burstTimer: BURST 버튼 누른 후 60프레임 동안 카운트다운
+   currentMode: 현재 시각 모드 인덱스
+   segmentCount: 만화경 대칭 조각 수
+─────────────────────────────────────────────────────────── */
+let time = 0, globalRot = 0;
+let speedMultiplier = 0.25, burstTimer = 0;
+let currentMode = 0, segmentCount = 12;
+
+/* ───────────────────────────────────────────────────────────
+   4. 줌(확대·축소) 시스템
+   currentScale: 현재 렌더링에 적용되는 스케일 (ctx.scale에 전달)
+   targetScale: 목표 스케일 — 스프링으로 currentScale이 따라감
+   zoomVelocity: 스프링 이징용 속도 누적값
+   zoomHoldTimer/Duration: 목표에 도달 후 다음 목표까지 대기 시간
+─────────────────────────────────────────────────────────── */
+let currentScale = 1.0, targetScale = 1.0, zoomVelocity = 0;
+let zoomHoldTimer = 0, zoomHoldDuration = 0;
+
+// 새 줌 목표 설정: 0.55~1.9 사이 랜덤, 5~12초 대기
+function newZoomTarget() {
+  targetScale      = 0.55 + Math.random() * 1.35;
+  zoomHoldDuration = 300  + Math.floor(Math.random() * 420);
+  zoomHoldTimer    = 0;
+}
+
+// 매 프레임 호출 — 스프링 물리로 currentScale을 targetScale 쪽으로 이동
+// 스프링 강도(0.003)가 낮을수록 느리게, 감쇠(0.97)가 높을수록 부드럽게
+function updateZoom() {
+  zoomVelocity  = zoomVelocity * 0.97 + (targetScale - currentScale) * 0.003;
+  currentScale += zoomVelocity;
+  // 목표에 충분히 가까워지면 대기 타이머 증가 → 시간이 차면 새 목표 설정
+  if (Math.abs(targetScale - currentScale) < 0.015 && Math.abs(zoomVelocity) < 0.001) {
+    if (++zoomHoldTimer >= zoomHoldDuration) newZoomTarget();
+  }
+}
+newZoomTarget(); // 시작 시 첫 목표 설정
+
+/* ───────────────────────────────────────────────────────────
+   5. 물결/썰물 파동 시스템
+   waves[]: 현재 화면에서 움직이는 파동 객체 배열
+   waveIdle: 파동이 없는 대기 상태 여부
+   waveTimer/Duration: 다음 파동까지 카운트다운
+─────────────────────────────────────────────────────────── */
+const waves = [];
+let waveIdle = true,
+    waveTimer = 0,
+    waveDuration = 480 + Math.floor(Math.random() * 720); // 8~20초 랜덤 간격
+
+// ripple: 중앙에서 바깥으로 퍼지는 물결
+// 여러 겹(5~8개)을 delay를 두어 순차 발동
+function triggerRipple() {
+  const pal   = palette();
+  const count = 5 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < count; i++) {
+    waves.push({
+      type:  'ripple',
+      r:     0,                          // 현재 반지름 (0에서 시작해 커짐)
+      maxR:  Math.min(W, visH) * 0.75,     // 최대 반지름
+      speed: 1.0 + Math.random() * 1.2, // 확장 속도 (픽셀/프레임)
+      color: pal[Math.floor(Math.random() * pal.length)],
+      alpha: 0.55 + Math.random() * 0.3, // 시작 투명도
+      lineW: 1.5  + Math.random() * 2.5, // 선 두께
+      delay: i * 20,  // i번째 파동은 i*20프레임 뒤에 시작
+      delayT: 0,      // 딜레이 카운터
+      born:  false,   // 딜레이 완료 여부
+    });
+  }
+}
+
+// tide: 바깥에서 안으로 수축하는 썰물
+// maxR에서 시작해 r=0으로 줄어듦
+function triggerTide() {
+  const pal  = palette();
+  const count = 5 + Math.floor(Math.random() * 4);
+  const maxR  = Math.min(W, visH) * 0.75;
+  for (let i = 0; i < count; i++) {
+    waves.push({
+      type:  'tide',
+      r:     maxR,   // 현재 반지름 (최대에서 시작해 작아짐)
+      maxR,
+      speed: 1.0 + Math.random() * 1.2,
+      color: pal[Math.floor(Math.random() * pal.length)],
+      alpha: 0.55 + Math.random() * 0.3,
+      lineW: 1.5  + Math.random() * 2.5,
+      delay: i * 20,
+      delayT: 0,
+      born:  false,
+    });
+  }
+}
+
+// 매 프레임: 대기 타이머 증가 → 시간이 차면 ripple/tide 랜덤 발동
+// 각 파동 객체의 반지름과 투명도 업데이트 후 소멸 판정
+function updateWaves() {
+  if (waveIdle) {
+    waveTimer++;
+    if (waveTimer >= waveDuration) {
+      waveIdle     = false;
+      waveDuration = 480 + Math.floor(Math.random() * 720); // 다음 간격 재설정
+      waveTimer    = 0;
+      if (Math.random() < 0.5) triggerRipple(); else triggerTide();
+    }
+  }
+  // 모든 파동이 소멸하면 대기 상태로 복귀
+  if (!waveIdle && waves.length === 0) waveIdle = true;
+
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const w = waves[i];
+
+    // 딜레이 처리: born=false이면 delayT 증가만 하고 스킵
+    if (!w.born) {
+      w.delayT++;
+      if (w.delayT < w.delay) continue;
+      w.born = true; // 딜레이 완료 → 실제 움직임 시작
+    }
+
+    if (w.type === 'ripple') {
+      w.r    += w.speed;   // 반지름 증가 (바깥으로 퍼짐)
+      w.alpha *= 0.994;    // 매 프레임 0.6%씩 투명해짐
+      // 최대 크기 초과 또는 거의 투명해지면 배열에서 제거
+      if (w.r > w.maxR || w.alpha < 0.012) { waves.splice(i, 1); continue; }
+    } else {
+      w.r    -= w.speed;   // 반지름 감소 (안으로 수축)
+      w.alpha *= 0.994;
+      if (w.r < 0 || w.alpha < 0.012) { waves.splice(i, 1); continue; }
+    }
+  }
+}
+
+// 파동 배열을 캔버스에 그림
+// ctx.save()/restore()로 전역 상태(globalAlpha 등) 보호
+function drawWaves() {
+  if (waves.length === 0) return;
+  ctx.save();
+  for (const w of waves) {
+    if (!w.born || w.r <= 0) continue; // 아직 태어나지 않았거나 반지름 0 미만 스킵
+    ctx.beginPath();
+    ctx.arc(0, 0, w.r, 0, Math.PI * 2); // 중앙(0,0) 기준 원 경로
+    ctx.strokeStyle = w.color;
+    ctx.lineWidth   = w.lineW;
+    ctx.globalAlpha = w.alpha;
+    if(!isMobile)ctx.shadowBlur=18;   // 빛나는 글로우 효과
+    ctx.shadowColor = w.color;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ───────────────────────────────────────────────────────────
+   6. 파티클 시스템
+   60개의 Particle 인스턴스가 화면을 떠돌며 만화경을 구성
+   각 파티클은 5가지 형태 중 하나: line / circle / diamond / star / arc
+─────────────────────────────────────────────────────────── */
+const particles = [];
+
+class Particle {
+  constructor() { this.reset(true); } // 생성 시 초기화 (init=true)
+
+  // 파티클 초기화 / 재활용
+  // init=true이면 화면 전역에 배치, false이면 중앙 근처에서 재탄생
+  reset(init = false) {
+    const r = init ? Math.random() * 240 : Math.random() * 30 + 5;
+    const a = Math.random() * Math.PI * 2;
+    this.x  = Math.cos(a) * r;  // 랜덤 각도의 원 위 좌표 x
+    this.y  = Math.sin(a) * r;  // 랜덤 각도의 원 위 좌표 y
+    this.vx = (Math.random() - 0.5) * 2.5; // x축 초기 속도
+    this.vy = (Math.random() - 0.5) * 2.5; // y축 초기 속도
+
+    this.radius     = Math.random() * 5 + 1; // 기본 반지름
+    this.baseRadius = this.radius;            // 펄스 계산 기준값 보관
+    this.color      = palette()[Math.floor(Math.random() * palette().length)];
+    this.life  = 1.0;                          // 수명 (1→0으로 감소)
+    this.decay = Math.random() * 0.003 + 0.001; // 매 프레임 감소량
+
+    // 형태 결정: 난수 구간에 따라 5가지 중 하나
+    const t = Math.random();
+    this.type = t < 0.25 ? 'line' : t < 0.5 ? 'circle' : t < 0.72 ? 'diamond' : t < 0.86 ? 'star' : 'arc';
+
+    // line 전용 속성
+    this.lineLen        = Math.random() * 160 + 40;   // 선 길이
+    this.lineAngle      = Math.random() * Math.PI * 2; // 현재 기울기
+    this.lineAngleSpeed = (Math.random() - 0.5) * 0.04; // 회전 속도
+
+    // arc 전용 속성
+    this.arcRadius = Math.random() * 55 + 15;
+    this.arcStart  = Math.random() * Math.PI * 2;
+    this.arcEnd    = this.arcStart + Math.random() * Math.PI * 1.5 + 0.3;
+
+    // 펄스 위상 오프셋: 각 파티클이 다른 타이밍에 맥동
+    this.pulseOffset = Math.random() * Math.PI * 2;
+  }
+
+  // 매 프레임 위치·속도·수명 업데이트
+  update() {
+    const sp = speedMultiplier + (burstTimer > 0 ? 2 : 0); // BURST 중에는 속도 +2
+    this.x += this.vx * sp;  // 속도에 배속 곱해서 이동
+    this.y += this.vy * sp;
+    this.life -= this.decay; // 수명 감소
+    this.lineAngle += this.lineAngleSpeed * sp; // 선 회전
+
+    // 사인파로 반지름 맥동 (0.8~1.0 사이)
+    this.radius = this.baseRadius * (0.8 + 0.2 * Math.sin(time * 3 + this.pulseOffset));
+
+    // 중앙 인력: 화면 중심에서 너무 멀어지면 안쪽으로 당김
+    const d  = Math.sqrt(this.x * this.x + this.y * this.y);
+    const mx = Math.min(W, visH) * 0.42; // 허용 최대 거리
+    if (d > mx) {
+      this.vx -= this.x * 0.003; // 중심 방향으로 가속
+      this.vy -= this.y * 0.003;
+    }
+
+    // 소용돌이 비틀기: SPIRAL 모드에서 강화 (0.008), 나머지는 약하게 (0.002)
+    // 현재 위치에 수직인 방향으로 미세 가속 → 회전 운동 유발
+    const twist = (currentMode === 1) ? 0.008 : 0.002;
+    this.vx += -this.y * twist;
+    this.vy +=  this.x * twist;
+
+    // 수명 소진 시 재탄생
+    if (this.life <= 0) this.reset();
+  }
+
+  // 파티클을 ctx에 그림
+  // cx: 현재 ctx (만화경 대칭 반복 시 동일한 ctx를 전달)
+  draw(cx) {
+    cx.save();
+    cx.translate(this.x, this.y); // 파티클 위치로 좌표계 이동
+
+    cx.globalAlpha = this.life * 0.75;
+    cx.strokeStyle = this.color;
+    cx.fillStyle   = this.color;
+
+    // 모바일: shadowBlur 비활성화 (가장 비싼 GPU 연산)
+    // 데스크탑: AURORA·GALAXY 모드 글로우 강화
+    if (!isMobile) {
+      cx.shadowBlur  = (currentMode === 2 || currentMode === 10 ? 22 : 10) + Math.sin(time * 4 + this.pulseOffset) * 6;
+      cx.shadowColor = this.color;
+    } else {
+      cx.shadowBlur = 0;
+    }
+
+    if (this.type === 'line') {
+      // ─ 긴 직선: 양 끝이 투명해지는 그라디언트 선
+      cx.rotate(this.lineAngle);
+      const g = cx.createLinearGradient(-this.lineLen/2, 0, this.lineLen/2, 0);
+      g.addColorStop(0,   'rgba(0,0,0,0)'); // 왼쪽 끝 투명
+      g.addColorStop(0.3, this.color);       // 안쪽부터 불투명
+      g.addColorStop(0.7, this.color);
+      g.addColorStop(1,   'rgba(0,0,0,0)'); // 오른쪽 끝 투명
+      cx.strokeStyle = g;
+      cx.lineWidth   = 1.5 + Math.sin(time * 5) * 0.5; // 두께도 맥동
+      cx.beginPath();
+      cx.moveTo(-this.lineLen/2, 0);
+      cx.lineTo( this.lineLen/2, 0);
+      cx.stroke();
+
+    } else if (this.type === 'circle') {
+      // ─ 원: 안쪽 불투명 원 + 바깥쪽 후광(큰 원, 낮은 투명도)
+      cx.beginPath();
+      cx.arc(0, 0, this.radius * 2.5, 0, Math.PI*2);
+      cx.globalAlpha = this.life * 0.15; // 후광은 매우 투명하게
+      cx.fill();
+      cx.globalAlpha = this.life * 0.75; // 본체는 불투명하게
+      cx.beginPath();
+      cx.arc(0, 0, this.radius, 0, Math.PI*2);
+      cx.fill();
+
+    } else if (this.type === 'diamond') {
+      // ─ 다이아몬드(마름모): 상하로 늘린 사각형 + 내부 하이라이트
+      const r = this.radius * 2;
+      cx.beginPath();
+      cx.moveTo(0, -r*1.4); // 위 꼭짓점
+      cx.lineTo(r,  0);     // 오른쪽
+      cx.lineTo(0,  r*1.4); // 아래
+      cx.lineTo(-r, 0);     // 왼쪽
+      cx.closePath();
+      cx.fill();
+      // 내부 흰색 하이라이트 (보석 반짝임)
+      cx.globalAlpha = this.life * 0.4;
+      cx.fillStyle   = '#FFFFFF';
+      cx.beginPath();
+      cx.moveTo(0,    -r*0.5);
+      cx.lineTo(r*0.4, 0);
+      cx.lineTo(0,     r*0.5);
+      cx.lineTo(-r*0.4,0);
+      cx.closePath();
+      cx.fill();
+
+    } else if (this.type === 'star') {
+      // ─ 별(5각): outer/inner 반지름을 번갈아 이어 뾰족한 별 모양
+      let rot = (Math.PI/2)*3; // 맨 위 꼭짓점에서 시작 (-90도)
+      const step = Math.PI / 5; // 꼭짓점 간 각도 (36도)
+      cx.beginPath();
+      cx.moveTo(0, -this.radius * 2.5);
+      for (let i = 0; i < 5; i++) {
+        cx.lineTo(Math.cos(rot) * this.radius*2.5, Math.sin(rot) * this.radius*2.5); // 바깥 꼭짓점
+        rot += step;
+        cx.lineTo(Math.cos(rot) * this.radius,     Math.sin(rot) * this.radius);     // 안쪽 오목점
+        rot += step;
+      }
+      cx.closePath();
+      cx.globalAlpha = this.life * 0.75;
+      cx.fillStyle   = this.color;
+      cx.fill();
+
+    } else {
+      // ─ 호(arc): 원호 일부만 그림 — time에 따라 회전
+      cx.lineWidth   = 2;
+      cx.strokeStyle = this.color;
+      cx.beginPath();
+      cx.arc(0, 0, this.arcRadius,
+             this.arcStart + time * 0.5, // 시작각이 시간에 따라 이동
+             this.arcEnd   + time * 0.5);
+      cx.stroke();
+    }
+    cx.restore();
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   7. 배경 드로잉 헬퍼 함수들
+─────────────────────────────────────────────────────────── */
+
+// 동심원 링 그리기: 6개의 희미한 원을 시간에 따라 맥동
+function drawRings() {
+  const pal = palette();
+  ctx.save();
+  for (let i = 0; i < 6; i++) {
+    // 반지름: 기본값 + 사인파로 흔들림 (숨쉬는 느낌)
+    const r   = (i+1) * (Math.min(W,visH) * 0.08) + Math.sin(time*1.2+i) * 15;
+    const col = pal[i % pal.length];
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI*2);
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 0.5;
+    ctx.globalAlpha = 0.08 + 0.05 * Math.sin(time*2+i); // 투명도도 맥동
+    if(!isMobile){if(!isMobile)ctx.shadowBlur=20;ctx.shadowColor=col;}
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// 중앙 발광 핵 그리기: 라디얼 그라디언트 글로우 + 중심 흰 점
+function drawCore() {
+  const pal   = palette();
+  // BURST 중에는 pulse 값이 커져서 핵이 팽창
+  const pulse = 6 + Math.sin(time*5)*3 + (burstTimer > 0 ? 20 : 0);
+  ctx.save();
+  // 외부 글로우: 팔레트 2가지 색이 중심에서 바깥으로 투명해지는 원형 그라디언트
+  const g = ctx.createRadialGradient(0,0,0, 0,0, pulse*4);
+  g.addColorStop(0,   hexToRgba(pal[0], 0.67));
+  g.addColorStop(0.5, hexToRgba(pal[1], 0.27));
+  g.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.arc(0, 0, pulse*4, 0, Math.PI*2);
+  ctx.fillStyle   = g;
+  ctx.globalAlpha = 0.6;
+  ctx.fill();
+  // 중심 흰 점: 강한 glowBlur로 빛나는 느낌
+  ctx.beginPath();
+  ctx.arc(0, 0, pulse, 0, Math.PI*2);
+  ctx.fillStyle   = '#FFFFFF';
+  ctx.globalAlpha = 0.9;
+  if(!isMobile){if(!isMobile)ctx.shadowBlur=30;ctx.shadowColor=pal[0];}
+  ctx.fill();
+  ctx.restore();
+}
+
+// 현재 모드에 따른 배경 효과 그리기
+// ctx.save()/restore()로 감싸 globalAlpha 등 상태 누출 방지
+function drawModeEffect() {
+  const mode = MODES[currentMode];
+  const pal  = palette();
+  ctx.save();
+  ctx.shadowBlur = 0; // 모드 효과는 shadowBlur 없이
+
+  if (mode === 'aurora') {
+    // 오로라: 3방향의 반투명 선형 그라디언트가 시간에 따라 회전
+    for (let i = 0; i < 3; i++) {
+      const w = Math.min(W,visH) * 0.6;
+      const a = (time*0.4 + i*2.1) % (Math.PI*2); // 각 레이어 다른 속도로 회전
+      const g = ctx.createLinearGradient(
+        Math.cos(a)*w,  Math.sin(a)*w,   // 그라디언트 시작점
+       -Math.cos(a)*w, -Math.sin(a)*w    // 그라디언트 끝점
+      );
+      g.addColorStop(0,   'rgba(0,0,0,0)');
+      g.addColorStop(0.5, hexToRgba(pal[i%pal.length], 0.09)); // 중간만 살짝 빛남
+      g.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.fillStyle   = g;
+      ctx.globalAlpha = 1;
+      ctx.fillRect(-centerX, -centerY, W, H); // 전체 화면에 그라디언트 칠하기
+    }
+  }
+
+  if (mode === 'crystal') {
+    // 수정: 40px 간격의 수직·수평 격자선 (반투명)
+    ctx.globalAlpha = 0.05;
+    ctx.strokeStyle = pal[0];
+    ctx.lineWidth   = 0.5;
+    for (let x = -centerX; x < centerX; x += 40) {
+      ctx.beginPath(); ctx.moveTo(x,-centerY); ctx.lineTo(x,centerY); ctx.stroke();
+    }
+    for (let y = -centerY; y < centerY; y += 40) {
+      ctx.beginPath(); ctx.moveTo(-centerX,y); ctx.lineTo(centerX,y); ctx.stroke();
+    }
+  }
+
+  if (mode === 'nova') {
+    // 노바: 16방향으로 퍼지는 방사형 빔 — 시간에 따라 천천히 회전
+    for (let i = 0; i < 16; i++) {
+      const a   = (i/16)*Math.PI*2 + time*0.3; // 각 빔의 각도
+      const len = Math.min(W,visH) * 0.5;
+      const col = pal[i % pal.length];
+      // 중심에서 끝으로 갈수록 투명해지는 선형 그라디언트
+      const g = ctx.createLinearGradient(0, 0, Math.cos(a)*len, Math.sin(a)*len);
+      g.addColorStop(0, hexToRgba(col, 0.4));
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a)*len, Math.sin(a)*len);
+      ctx.strokeStyle = g;
+      ctx.lineWidth   = 2;
+      ctx.globalAlpha = 0.2 + 0.1*Math.sin(time*3+i); // 밝기도 맥동
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'flower') {
+    // 꽃잎: 꽃잎 모양의 로즈 곡선이 천천히 회전하며 겹쳐짐
+    const petals = 7;
+    for (let p = 0; p < petals; p++) {
+      const baseAngle = (p / petals) * Math.PI * 2 + time * 0.15;
+      const col = pal[p % pal.length];
+      ctx.beginPath();
+      for (let j = 0; j <= 120; j++) {
+        const theta = (j / 120) * Math.PI * 2;
+        // 로즈 곡선: r = cos(k*theta) 변형
+        const r = Math.min(W,visH) * 0.32 * Math.abs(Math.cos(3 * theta));
+        const x = Math.cos(theta + baseAngle) * r;
+        const y = Math.sin(theta + baseAngle) * r;
+        j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.2;
+      ctx.globalAlpha = 0.12 + 0.06 * Math.sin(time * 2 + p);
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=12;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'web') {
+    // 거미줄: 동심 다각형 + 방사형 선이 교차
+    const rings = 8, spokes = 16;
+    const maxR  = Math.min(W,visH) * 0.45;
+    // 방사형 선
+    for (let i = 0; i < spokes; i++) {
+      const a = (i / spokes) * Math.PI * 2 + time * 0.05;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(a)*maxR, Math.sin(a)*maxR);
+      ctx.strokeStyle = pal[i % pal.length];
+      ctx.lineWidth   = 0.6;
+      ctx.globalAlpha = 0.12;
+      ctx.shadowBlur  = 0;
+      ctx.stroke();
+    }
+    // 동심 다각형
+    for (let r = 1; r <= rings; r++) {
+      const rad = (r / rings) * maxR;
+      const col = pal[r % pal.length];
+      ctx.beginPath();
+      for (let i = 0; i <= spokes; i++) {
+        const a = (i / spokes) * Math.PI * 2 + time * 0.05;
+        const x = Math.cos(a) * rad, y = Math.sin(a) * rad;
+        i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 0.8;
+      ctx.globalAlpha = 0.10 + 0.05 * Math.sin(time + r);
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=8;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'pulse') {
+    // 펄스: 중심에서 동심원들이 시간에 따라 파동처럼 팽창
+    const rings = 12, maxR = Math.min(W,visH) * 0.5;
+    for (let i = 0; i < rings; i++) {
+      // 각 링은 phase 오프셋이 달라 물결처럼 겹쳐 보임
+      const phase = (time * 1.5 + i * 0.7) % (Math.PI * 2);
+      const r     = maxR * (i / rings) + Math.sin(phase) * 18;
+      const col   = pal[i % pal.length];
+      const alpha = 0.06 + 0.08 * Math.abs(Math.sin(phase));
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(1, r), 0, Math.PI*2);
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.5 + Math.sin(phase) * 1;
+      ctx.globalAlpha = alpha;
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=15;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'vortex') {
+    // 소용돌이: 나선형 아크가 빠르게 회전
+    const arms = 6;
+    for (let a = 0; a < arms; a++) {
+      const col     = pal[a % pal.length];
+      const baseRot = (a / arms) * Math.PI * 2 + time * 0.6;
+      ctx.beginPath();
+      for (let j = 0; j <= 200; j++) {
+        const t2  = j / 200;
+        const ang = baseRot + t2 * Math.PI * 4; // 2바퀴 나선
+        const r   = t2 * Math.min(W,visH) * 0.45;
+        const x   = Math.cos(ang) * r, y = Math.sin(ang) * r;
+        j === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.5;
+      ctx.globalAlpha = 0.18 + 0.08 * Math.sin(time * 2 + a);
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=10;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'prism') {
+    // 프리즘: 무지개 색의 동심 삼각형들이 회전하며 겹쳐짐
+    const layers = 10, maxR = Math.min(W,visH) * 0.42;
+    for (let i = 0; i < layers; i++) {
+      const r    = maxR * ((i+1) / layers);
+      const rot  = time * 0.2 * (i%2===0 ? 1 : -1) + (i/layers)*Math.PI;
+      const col  = pal[i % pal.length];
+      const sides = 3 + (i % 4); // 3~6각형 번갈아
+      ctx.beginPath();
+      for (let s = 0; s <= sides; s++) {
+        const ang = (s/sides)*Math.PI*2 + rot;
+        const x = Math.cos(ang)*r, y = Math.sin(ang)*r;
+        s===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1;
+      ctx.globalAlpha = 0.09 + 0.05 * Math.sin(time * 1.5 + i);
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=10;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'galaxy') {
+    // 은하수: 여러 개의 나선팔이 매우 느리게 회전
+    const arms = 4, maxR = Math.min(W,visH) * 0.48;
+    for (let a = 0; a < arms; a++) {
+      const col     = pal[a % pal.length];
+      const baseRot = (a / arms) * Math.PI * 2 + time * 0.08;
+      // 나선팔 본체
+      ctx.beginPath();
+      for (let j = 0; j <= 300; j++) {
+        const t2  = j / 300;
+        const ang = baseRot + t2 * Math.PI * 5;
+        const r   = t2 * maxR * (0.8 + 0.2*Math.sin(t2*8));
+        const x = Math.cos(ang)*r, y = Math.sin(ang)*r;
+        j===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      const grad = ctx.createLinearGradient(0, 0, Math.cos(baseRot)*maxR, Math.sin(baseRot)*maxR);
+      grad.addColorStop(0, hexToRgba(col, 0.5));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.strokeStyle = grad;
+      ctx.lineWidth   = 2;
+      ctx.globalAlpha = 0.22;
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=14;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'ripple') {
+    // 리플: 육각형 파문들이 동심으로 퍼지며 겹쳐짐
+    const layers = 9, maxR = Math.min(W,visH) * 0.46;
+    for (let i = 0; i < layers; i++) {
+      const phase = (time * 0.8 - i * 0.5) % (Math.PI*2);
+      const r     = maxR * ((i+1)/layers) + Math.sin(phase) * 12;
+      const col   = pal[i % pal.length];
+      const sides = 6;
+      const rot   = time * 0.1 + (i * Math.PI / layers);
+      ctx.beginPath();
+      for (let s = 0; s <= sides; s++) {
+        const ang = (s/sides)*Math.PI*2 + rot;
+        const x = Math.cos(ang)*r, y = Math.sin(ang)*r;
+        s===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 1.2;
+      ctx.globalAlpha = 0.07 + 0.07 * Math.abs(Math.sin(phase));
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=12;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  if (mode === 'fractal') {
+    // 프랙탈: 크기가 다른 사각형들이 서로 다른 속도로 회전하며 겹쳐짐
+    const layers = 12, maxR = Math.min(W,visH) * 0.44;
+    for (let i = 0; i < layers; i++) {
+      const r   = maxR * Math.pow((i+1)/layers, 0.7);
+      const rot = time * (0.05 + i*0.04) * (i%2===0 ? 1 : -1);
+      const col = pal[i % pal.length];
+      const sides = 4;
+      ctx.beginPath();
+      for (let s = 0; s <= sides; s++) {
+        const ang = (s/sides)*Math.PI*2 + rot;
+        const x = Math.cos(ang)*r, y = Math.sin(ang)*r;
+        s===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 0.8;
+      ctx.globalAlpha = 0.08 + 0.06 * Math.sin(time*2 + i*0.5);
+      if(!isMobile){if(!isMobile)ctx.shadowBlur=8;ctx.shadowColor=col;}
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+/* ───────────────────────────────────────────────────────────
+   사이메틱스 시스템 — 독립 오버레이 레이어
+   만화경 위에 겹쳐 그리며, -1이면 꺼짐
+─────────────────────────────────────────────────────────── */
+let cymaticsType = -1; // -1 = OFF
+
+// 공통 Marching Squares 등고선 그리기 헬퍼
+// fieldFn(px, py) → 0~1 스칼라값을 반환하는 함수를 받아 등고선 추출
+function drawContour(fieldFn, thresholds, maxR, gridSize) {
+  const step = (maxR * 2) / gridSize;
+  const pal  = palette();
+  thresholds.forEach(({ val, col, lw, alpha, pulse }) => {
+    ctx.strokeStyle = col || pal[0];
+    ctx.lineWidth   = lw;
+    ctx.globalAlpha = alpha;
+    if(!isMobile){if(!isMobile)ctx.shadowBlur=16;ctx.shadowColor=col || pal[0];}
+    const thr = val + (pulse || 0) * Math.sin(time * 1.8);
+    for (let ix = 0; ix < gridSize - 1; ix++) {
+      for (let iy = 0; iy < gridSize - 1; iy++) {
+        const x0 = ix * step - maxR, y0 = iy * step - maxR;
+        const x1 = x0 + step,        y1 = y0 + step;
+        const f00 = fieldFn(x0, y0);
+        const f10 = fieldFn(x1, y0);
+        const f01 = fieldFn(x0, y1);
+        const f11 = fieldFn(x1, y1);
+        if ((f00 < thr) !== (f10 < thr)) {
+          const ta = (thr - f00) / (f10 - f00 + 1e-6);
+          if ((f01 < thr) !== (f11 < thr)) {
+            const tb = (thr - f01) / (f11 - f01 + 1e-6);
+            ctx.beginPath();
+            ctx.moveTo(x0 + ta * step, y0);
+            ctx.lineTo(x0 + tb * step, y1);
+            ctx.stroke();
+          }
+        }
+        if ((f00 < thr) !== (f01 < thr)) {
+          const ta = (thr - f00) / (f01 - f00 + 1e-6);
+          if ((f10 < thr) !== (f11 < thr)) {
+            const tb = (thr - f10) / (f11 - f10 + 1e-6);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0 + ta * step);
+            ctx.lineTo(x1, y0 + tb * step);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+  });
+}
+
+function drawCymatics() {
+  if (cymaticsType < 0) return;
+  const pal  = palette();
+  const maxR = Math.min(W, visH) * 0.46;
+  const G    = isMobile ? 44 : 72; // 모바일: 격자 44×44(1936셀) vs 데스크탑 72×72(5184셀)
+  ctx.save();
+
+  // 3겹 등고선 레이어 설정
+  const layers = [
+    { val: 0.04,  col: pal[0], lw: 2.0, alpha: 0.28, pulse: 0.04 },
+    { val: 0.18,  col: pal[1], lw: 1.3, alpha: 0.18, pulse: 0.03 },
+    { val: 0.35,  col: pal[2 % pal.length], lw: 0.8, alpha: 0.11, pulse: 0.02 },
+  ];
+
+  const ph = time * 0.035; // 천천히 변화하는 위상
+
+  if (cymaticsType === 0) {
+    // ── Chladni 기본: |sin(m·x)·sin(n·y)| 직교 정상파
+    const m = 2 + Math.abs(Math.sin(ph * 0.7)) * 4;
+    const n = 2 + Math.abs(Math.cos(ph * 0.5 + 1)) * 4;
+    drawContour((x, y) => {
+      const nx = (x / maxR) * Math.PI * m;
+      const ny = (y / maxR) * Math.PI * n;
+      return Math.abs(Math.sin(nx) * Math.sin(ny));
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 1) {
+    // ── 원형 파동: 동심원 정상파 (베셀 J0 근사)
+    const k = 3 + Math.abs(Math.sin(ph)) * 5;
+    drawContour((x, y) => {
+      const r = Math.sqrt(x*x + y*y) / maxR * Math.PI * k;
+      return Math.abs(Math.sin(r + Math.sin(ph * 2) * 0.5));
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 2) {
+    // ── 별형 공명: 극좌표 정상파 |sin(k·θ)·sin(r)|
+    const k = Math.floor(3 + Math.abs(Math.sin(ph * 0.6)) * 5); // 3~8 정수
+    drawContour((x, y) => {
+      const r = Math.sqrt(x*x + y*y) / maxR * Math.PI * 4;
+      const theta = Math.atan2(y, x);
+      return Math.abs(Math.sin(k * theta + ph) * Math.sin(r));
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 3) {
+    // ── 격자 간섭: 4방향 평면파 중첩
+    const k = 3 + Math.abs(Math.sin(ph * 0.4)) * 3;
+    const ang = ph * 0.3;
+    drawContour((x, y) => {
+      const nx = x / maxR * Math.PI * k;
+      const ny = y / maxR * Math.PI * k;
+      const w1 = Math.sin(nx);
+      const w2 = Math.sin(ny);
+      const w3 = Math.sin(nx * Math.cos(ang) + ny * Math.sin(ang));
+      const w4 = Math.sin(-nx * Math.sin(ang) + ny * Math.cos(ang));
+      return Math.abs((w1 + w2 + w3 + w4) / 4);
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 4) {
+    // ── 리사주 망: Lissajous 주파수비 격자망
+    const a = 2 + Math.floor(Math.abs(Math.sin(ph * 0.5)) * 4);
+    const b = 3 + Math.floor(Math.abs(Math.cos(ph * 0.4)) * 3);
+    drawContour((x, y) => {
+      const nx = x / maxR * Math.PI * a;
+      const ny = y / maxR * Math.PI * b;
+      return Math.abs(Math.sin(nx) * Math.cos(ny) - Math.cos(nx) * Math.sin(ny + ph));
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 5) {
+    // ── 만다라 파동: 방위각 × 반경 고조파 조합
+    const p = 4 + Math.floor(Math.abs(Math.sin(ph * 0.3)) * 5); // 꽃잎 수
+    const q = 2 + Math.abs(Math.cos(ph * 0.5)) * 3;             // 반경 모드
+    drawContour((x, y) => {
+      const r     = Math.sqrt(x*x + y*y) / maxR;
+      const theta = Math.atan2(y, x);
+      const radial  = Math.sin(q * Math.PI * r * 3 + ph);
+      const angular = Math.cos(p * theta + ph * 0.5);
+      return Math.abs(radial * angular);
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 6) {
+    // ── 베셀 함수: J_n(k·r)·cos(n·θ) 실제 원형 막 진동 모드
+    const n  = Math.floor(1 + Math.abs(Math.sin(ph * 0.4)) * 5); // 방위각 모드
+    const kn = 2 + Math.abs(Math.cos(ph * 0.3)) * 4;             // 반경 스케일
+    drawContour((x, y) => {
+      const r     = Math.sqrt(x*x + y*y) / maxR * Math.PI * kn;
+      const theta = Math.atan2(y, x);
+      // J_n 근사: sin(r - n·π/2 - π/4) / sqrt(r+0.1)
+      const jn = Math.sin(r - n * Math.PI/2 - Math.PI/4) / Math.sqrt(r + 0.5);
+      return Math.abs(jn * Math.cos(n * theta + ph * 0.3));
+    }, layers, maxR, G);
+
+  } else if (cymaticsType === 7) {
+    // ── 나선 정상파: 아르키메데스 나선 위의 정상파 간섭
+    const arms = 3 + Math.floor(Math.abs(Math.sin(ph * 0.35)) * 4);
+    const freq = 3 + Math.abs(Math.cos(ph * 0.25)) * 4;
+    drawContour((x, y) => {
+      const r     = Math.sqrt(x*x + y*y) / maxR;
+      const theta = Math.atan2(y, x);
+      // 나선 위상: r - θ/(2π)로 나선 형성
+      const spiral = r * freq - theta * arms / (2 * Math.PI) + ph;
+      return Math.abs(Math.sin(spiral * Math.PI));
+    }, layers, maxR, G);
+  }
+
+  ctx.restore();
+}
+
+/* ───────────────────────────────────────────────────────────
+   8. Web Audio 음악 엔진
+   audioCtx: Web Audio API의 핵심 AudioContext
+   masterGain: 최종 볼륨 노드 — 모든 사운드가 여기를 거쳐 스피커로 출력
+   musicNodes: 현재 재생 중인 모든 노드 배열 (음악 전환 시 일괄 정리)
+─────────────────────────────────────────────────────────── */
+let audioCtx = null, masterGain = null;
+let musicNodes = [];
+
+// AudioContext 초기화 (브라우저 자동재생 정책 때문에 클릭 후 호출)
+function initAudio() {
+  audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+  masterGain.connect(audioCtx.destination); // 스피커 출력에 연결
+}
+
+// 현재 재생 중인 모든 오디오 노드 정지·연결 해제
+function stopMusic() {
+  // audioLoop 타이머 정리
+  if (musicNodes._timers) {
+    musicNodes._timers.forEach(t => clearTimeout(t));
+  }
+  musicNodes.forEach(n => {
+    try { n.stop(); } catch(e){}
+    try { n.disconnect(); } catch(e){}
+  });
+  musicNodes = [];
+}
+
+// 컨볼루션 리버브 생성: 임펄스 응답(노이즈 감쇠)으로 공간감 효과
+// decay: 리버브 길이(초), wet: 리버브 비율
+function makeReverb(decay, wet) {
+  const conv = audioCtx.createConvolver();
+  const len  = audioCtx.sampleRate * decay;
+  const buf  = audioCtx.createBuffer(2, len, audioCtx.sampleRate);
+  // 각 채널에 지수적으로 감쇠하는 화이트 노이즈 채움
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/len, 1.5);
+  }
+  conv.buffer = buf;
+  const wetG = audioCtx.createGain();
+  wetG.gain.value = wet; // wet: 리버브 비율
+  conv.connect(wetG);
+  wetG.connect(masterGain);
+  musicNodes.push(conv, wetG);
+  return conv; // 이후 다른 노드들이 conv에 연결해 리버브 통과
+}
+
+// 지속음(드론) 오실레이터 생성: 일정 주파수를 계속 울리는 기초 사운드
+// freq: 주파수(Hz), type: 파형, gain: 음량, detune: 미세 이탈(cents)
+function makeDrone(freq, type, gain, detune) {
+  const osc = audioCtx.createOscillator();
+  const g   = audioCtx.createGain();
+  osc.type  = type;
+  osc.frequency.value = freq;
+  if (detune) osc.detune.value = detune; // 미세 음정 이탈로 더 풍부한 질감
+  g.gain.setValueAtTime(0, audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(gain, audioCtx.currentTime + 4); // 4초에 걸쳐 페이드인
+  osc.connect(g);
+  g.connect(masterGain);
+  osc.start();
+  musicNodes.push(osc, g);
+  return { osc, g }; // osc: 주파수 변조용, g: 볼륨 변조용
+}
+
+// LFO(저주파 오실레이터): 다른 파라미터(주파수·볼륨 등)를 느리게 흔들어 생동감 부여
+// rate: 진동 속도, depth: 진폭, target: 변조할 AudioParam, offset: 시작 시간 오프셋
+function makeLFO(rate, depth, target, offset) {
+  const lfo = audioCtx.createOscillator();
+  const lg  = audioCtx.createGain();
+  lfo.frequency.value = rate;
+  lg.gain.value       = depth;
+  lfo.connect(lg);
+  lg.connect(target); // target AudioParam에 직접 연결 → 값이 ±depth 범위로 진동
+  lfo.start(audioCtx.currentTime + (offset||0));
+  musicNodes.push(lfo, lg);
+}
+
+// 단발 노트 스케줄링: t초 뒤에 freq 음을 dur초 동안 재생
+function schedNote(freq, t, dur, gain, rev) {
+  const osc = audioCtx.createOscillator();
+  const g   = audioCtx.createGain();
+  osc.type  = 'sine';
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t+0.3);
+  g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  osc.connect(g);
+  g.connect(rev || masterGain);
+  osc.start(t);
+  osc.stop(t+dur+0.1);
+  musicNodes.push(osc, g);
+}
+
+// ── Lookahead Scheduler ────────────────────────────────────
+// setTimeout 대신 AudioContext 타임라인 기반으로 노트를 미리 예약
+// JS 스레드 지연에 영향받지 않아 모바일서 음악 끊김 방지
+// cb: 다음 배치를 스케줄할 콜백, intervalSec: 반복 간격(초)
+function audioLoop(cb, intervalSec) {
+  let nextTime = audioCtx.currentTime + 0.1;
+  const LOOKAHEAD = intervalSec * 1.5; // 1.5배 앞서 스케줄
+  function schedule() {
+    if (nextTime < audioCtx.currentTime + LOOKAHEAD) {
+      cb(nextTime);
+      nextTime += intervalSec + (Math.random() * intervalSec * 0.5);
+    }
+    // 체크 간격: interval의 절반 — JS 타이머 정밀도보다 오디오 타임라인이 정확함
+    const tid = setTimeout(schedule, (intervalSec * 500));
+    musicNodes._timers = musicNodes._timers || [];
+    musicNodes._timers.push(tid);
+  }
+  schedule();
+}
+
+/* ── Universe Music ─────────────────────────────────────────
+   A0(27.5Hz) 심연 드론 + 5도 화음 레이어 + 별빛 스파클 고음
+   광활하고 묵직한 우주 공간감
+─────────────────────────────────────────────────────────── */
+function playUniverse() {
+  const rev = makeReverb(6, 0.7); // 길고 넓은 공간 리버브
+
+  // 기저 드론 화음 (A0~A2, E2): 우주의 심연
+  const d1 = makeDrone(27.5, 'sine',     0.18); d1.g.connect(rev);
+  const d2 = makeDrone(55,   'sine',     0.14); d2.g.connect(rev);
+  const d3 = makeDrone(82.4, 'sine',     0.10); d3.g.connect(rev); // E2 (5도 위)
+  const d4 = makeDrone(110,  'sine',     0.08); d4.g.connect(rev);
+  const d5 = makeDrone(55,   'sawtooth', 0.025); d5.g.connect(rev); // 톱니파로 배음 추가
+
+  makeLFO(0.04, 8,    d2.osc.frequency); // d2 주파수를 느리게 흔들어 부유하는 느낌
+  makeLFO(0.07, 0.03, d1.g.gain);        // d1 볼륨을 맥동
+
+  // 고음 분위기 패드
+  const p1 = makeDrone(220, 'sine', 0.06,  3); p1.g.connect(rev);
+  const p2 = makeDrone(330, 'sine', 0.04, -5); p2.g.connect(rev);
+  const p3 = makeDrone(440, 'sine', 0.03,  7); p3.g.connect(rev);
+  makeLFO(0.05, 6, p1.osc.frequency, 1);
+  makeLFO(0.03, 4, p2.osc.frequency, 2);
+
+  // 별빛 스파클: 오디오 루프로 고음역 음 미리 스케줄
+  const sparkle = [1760, 2093, 2349, 2637, 3136, 3520];
+  audioLoop(t => {
+    for (let i = 0; i < 3; i++) {
+      schedNote(sparkle[Math.floor(Math.random()*sparkle.length)],
+        t + Math.random()*6, 1.5+Math.random()*2, 0.022+Math.random()*0.018, rev);
+    }
+  }, 7);
+
+  // 깊은 베이스 펄스
+  audioLoop(t => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type='sine'; osc.frequency.value=27.5;
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(0.20,t+0.8);
+    g.gain.exponentialRampToValueAtTime(0.001,t+6);
+    osc.connect(g); g.connect(rev); osc.start(t); osc.stop(t+7);
+    musicNodes.push(osc,g);
+  }, 14);
+}
+
+/* ── Space Ambient Music ────────────────────────────────────
+   Dm7 코드 패드 + 움직이는 로우패스 필터 스윕 + 펜타토닉 멜로디
+   우주 유영하는 몽환적 느낌
+─────────────────────────────────────────────────────────── */
+function playSpaceAmbient() {
+  const rev = makeReverb(5, 0.65);
+
+  // 로우패스 필터: 고음을 차단하고 LFO로 컷오프 주파수를 흔들어 스윕 효과
+  const filter = audioCtx.createBiquadFilter();
+  filter.type  = 'lowpass';
+  filter.frequency.value = 300; // 초기 컷오프 300Hz
+  filter.Q.value = 3;           // 공명 강도
+  musicNodes.push(filter);
+
+  // Dm7 코드 패드 (D3-F3-A3-C4): 톱니파를 필터 통과시켜 부드럽게
+  [146.8, 174.6, 220, 261.6].forEach((f,i) => {
+    const d = makeDrone(f, 'sawtooth', 0.045-i*0.006, i*2);
+    d.osc.disconnect();      // masterGain 직결 끊기
+    d.osc.connect(filter);   // 필터 → gain → masterGain 경로로 재연결
+    filter.connect(d.g);
+    d.g.connect(rev);
+  });
+
+  // LFO 두 개를 다른 위상으로 필터 컷오프에 연결 → 불규칙한 스윕 느낌
+  makeLFO(0.06,  800, filter.frequency);
+  makeLFO(0.022, 400, filter.frequency, Math.PI); // 역위상으로 복잡성 추가
+
+  // 상위 에코 패드 (D4, A4)
+  const e1 = makeDrone(293.6, 'sine', 0.035, -3); e1.g.connect(rev);
+  const e2 = makeDrone(440,   'sine', 0.025,  5); e2.g.connect(rev);
+  makeLFO(0.04, 5, e1.osc.frequency, 0.5);
+  makeLFO(0.035,4, e2.osc.frequency, 1.2);
+
+  // 펜타토닉 스케일 멜로디: 랜덤 음을 느리게 이어서 연주
+  const penta = [293.6, 349.2, 392, 440, 523.2, 587.3];
+  audioLoop(t => {
+    let off = 0;
+    for (let i = 0; i < 5; i++) {
+      const f   = penta[Math.floor(Math.random() * penta.length)];
+      const dur = 3 + Math.random() * 4;
+      schedNote(f, t+off, dur, 0.04+Math.random()*0.03, rev);
+      off += dur * 0.6;
+    }
+  }, 15);
+
+  const bass = makeDrone(73.4, 'sine', 0.12); bass.g.connect(rev);
+  makeLFO(0.025, 0.04, bass.g.gain); // 베이스 볼륨 맥동
+}
+
+/* ── Calming Music ──────────────────────────────────────────
+   C장조 따뜻한 패드 + 느린 아르페지오 + 종소리
+   명상적이고 평온한 분위기
+─────────────────────────────────────────────────────────── */
+function playCalming() {
+  const rev = makeReverb(3.5, 0.55); // 적당한 공간감
+
+  // C장조 7화음 패드 (C3-E3-G3-B3): 따뜻한 사인파
+  [130.8, 164.8, 196, 246.9].forEach((f,i) => {
+    const d = makeDrone(f, 'sine', 0.06-i*0.008, i*1.5); d.g.connect(rev);
+    makeLFO(0.03+i*0.01, 1.5, d.osc.frequency, i*0.8); // 각 음 다른 속도로 흔들림
+  });
+
+  // 상위 패드 (G4, C5)
+  const h1 = makeDrone(392,   'sine', 0.04,  2); h1.g.connect(rev);
+  const h2 = makeDrone(523.2, 'sine', 0.03, -2); h2.g.connect(rev);
+  makeLFO(0.04,  2,   h1.osc.frequency);
+  makeLFO(0.035, 1.5, h2.osc.frequency);
+
+  // C장조 2옥타브 스케일 아르페지오: 위아래로 오가며 연주
+  const scale = [261.6,293.6,329.6,349.2,392,440,493.9,523.2,587.3,659.3,698.5,784];
+  let pos = 0, dir = 1; // pos: 현재 위치, dir: 방향(+1 오름, -1 내림)
+  audioLoop(t => {
+    schedNote(scale[pos], t, 2.5+Math.random(), 0.055, rev);
+    pos += dir;
+    if (pos >= scale.length-1) dir = -1;
+    if (pos <= 0)              dir =  1;
+  }, 1.1);
+
+  const bells = [1046.5, 1174.7, 1318.5, 1568, 2093];
+  audioLoop(t => {
+    schedNote(bells[Math.floor(Math.random()*bells.length)], t, 4+Math.random()*3, 0.04, rev);
+  }, 6);
+
+  const bass = makeDrone(65.4, 'sine', 0.10); bass.g.connect(rev);
+  makeLFO(0.02, 0.02, bass.g.gain);
+}
+
+/* ── Rain Forest ────────────────────────────────────────────
+   빗소리 노이즈 + 새소리 + 촉촉한 저음 드론
+   자연 속 열대우림의 고요함
+─────────────────────────────────────────────────────────── */
+function playRain() {
+  const rev = makeReverb(3, 0.6);
+
+  // 빗소리: 화이트 노이즈 버퍼로 구현
+  const bufLen = audioCtx.sampleRate * 3;
+  const noiseBuf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) nd[i] = (Math.random()*2-1);
+  const noise = audioCtx.createBufferSource();
+  noise.buffer = noiseBuf; noise.loop = true;
+  const noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'bandpass'; noiseFilter.frequency.value = 800; noiseFilter.Q.value = 0.5;
+  const noiseGain = audioCtx.createGain(); noiseGain.gain.value = 0.06;
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(rev);
+  noise.start(); musicNodes.push(noise, noiseFilter, noiseGain);
+
+  // 빗방울 튀기는 소리: 고음 랜덤 틱
+  audioLoop(t => {
+    for (let i = 0; i < 3; i++) {
+      const f = 400 + Math.random() * 1200;
+      schedNote(f, t + Math.random()*0.2, 0.08+Math.random()*0.1, 0.035+Math.random()*0.025, rev);
+    }
+  }, 0.3);
+
+  // 울창한 저음 숲 드론
+  const d1 = makeDrone(60, 'sine', 0.08); d1.g.connect(rev);
+  const d2 = makeDrone(90, 'sine', 0.05); d2.g.connect(rev);
+  makeLFO(0.02, 3, d1.osc.frequency);
+
+  // 새소리: 높은 음역 짧은 트릴
+  const birdNotes = [1200, 1400, 1600, 1800, 2000, 2400, 2800];
+  audioLoop(t => {
+    const f = birdNotes[Math.floor(Math.random()*birdNotes.length)];
+    const count = 2 + Math.floor(Math.random()*3);
+    for (let i = 0; i < count; i++) schedNote(f+Math.random()*200, t+i*0.08, 0.06, 0.03, rev);
+  }, 6);
+}
+
+/* ── Crystal Bowl ────────────────────────────────────────────
+   싱잉볼 / 크리스탈 명상 사운드
+   배음이 풍부한 금속성 울림
+─────────────────────────────────────────────────────────── */
+function playCrystal() {
+  const rev = makeReverb(5, 0.75);
+
+  // 기저 드론 (432Hz 명상 주파수 기반)
+  const d1 = makeDrone(108, 'sine', 0.10); d1.g.connect(rev);
+  const d2 = makeDrone(216, 'sine', 0.07); d2.g.connect(rev);
+  const d3 = makeDrone(432, 'sine', 0.05); d3.g.connect(rev);
+  makeLFO(0.015, 2, d1.osc.frequency);
+  makeLFO(0.02,  1, d2.osc.frequency, 1);
+
+  // 싱잉볼 타격음: 배음이 포함된 복합 음
+  const bowlFreqs = [432, 528, 639, 741, 852, 963];
+  audioLoop(t => {
+    const f = bowlFreqs[Math.floor(Math.random()*bowlFreqs.length)];
+    schedNote(f,   t,      6+Math.random()*4, 0.09, rev);
+    schedNote(f*2, t+0.01, 4+Math.random()*3, 0.04, rev);
+    schedNote(f*3, t+0.02, 3+Math.random()*2, 0.02, rev);
+  }, 8);
+
+  // 고음 오버톤 드론
+  const hi = makeDrone(864, 'sine', 0.025, 5); hi.g.connect(rev);
+  makeLFO(0.03, 3, hi.osc.frequency, 2);
+}
+
+/* ── Dreamscape ──────────────────────────────────────────────
+   꿈속 같은 몽환적 패드 + 느린 아르페지오
+   현실과 꿈 사이의 경계
+─────────────────────────────────────────────────────────── */
+function playDream() {
+  const rev = makeReverb(7, 0.8); // 매우 긴 리버브로 몽환감
+
+  // 느리게 이동하는 코드 패드 (Cmaj9)
+  [130.8, 164.8, 196, 246.9, 293.6].forEach((f,i) => {
+    const d = makeDrone(f, 'sine', 0.055 - i*0.007, i*3); d.g.connect(rev);
+    makeLFO(0.015 + i*0.005, 2, d.osc.frequency, i*1.5);
+  });
+
+  // 딜레이 효과: 짧은 딜레이 노드
+  const delay = audioCtx.createDelay(1.0);
+  delay.delayTime.value = 0.45;
+  const delayGain = audioCtx.createGain(); delayGain.gain.value = 0.4;
+  delay.connect(delayGain); delayGain.connect(delay); delayGain.connect(rev);
+  musicNodes.push(delay, delayGain);
+
+  // 몽환적 상승 아르페지오
+  const dreamScale = [261.6, 311.1, 369.9, 440, 523.2, 622.3, 739.9, 880];
+  let pos = 0;
+  audioLoop(t => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type='sine'; osc.frequency.value=dreamScale[pos % dreamScale.length];
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.06,t+0.5);
+    g.gain.exponentialRampToValueAtTime(0.001,t+4);
+    osc.connect(g); g.connect(delay); g.connect(rev);
+    osc.start(t); osc.stop(t+5); musicNodes.push(osc,g);
+    pos=(pos+1)%dreamScale.length;
+  }, 1.6);
+
+  const glitter = [1046.5, 1318.5, 1567.9, 2093, 2637];
+  audioLoop(t => {
+    schedNote(glitter[Math.floor(Math.random()*glitter.length)], t, 3+Math.random()*2, 0.03, rev);
+  }, 4);
+}
+
+/* ── Deep Ocean ─────────────────────────────────────────────
+   깊은 바다의 압도적 저음 + 고래 소리풍 선율
+   심해의 고요하고 웅장한 공간감
+─────────────────────────────────────────────────────────── */
+function playOcean() {
+  const rev = makeReverb(8, 0.8);
+
+  // 파도 노이즈
+  const bufLen = audioCtx.sampleRate * 4;
+  const waveBuf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+  const wd = waveBuf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) wd[i] = (Math.random()*2-1);
+  const waveSrc = audioCtx.createBufferSource();
+  waveSrc.buffer = waveBuf; waveSrc.loop = true;
+  const waveFilter = audioCtx.createBiquadFilter();
+  waveFilter.type = 'lowpass'; waveFilter.frequency.value = 400;
+  const waveGain = audioCtx.createGain(); waveGain.gain.value = 0.07;
+  const waveLFO = audioCtx.createOscillator(), waveLFOG = audioCtx.createGain();
+  waveLFO.frequency.value = 0.08; waveLFOG.gain.value = 0.04;
+  waveLFO.connect(waveLFOG); waveLFOG.connect(waveGain.gain);
+  waveSrc.connect(waveFilter); waveFilter.connect(waveGain); waveGain.connect(rev);
+  waveSrc.start(); waveLFO.start();
+  musicNodes.push(waveSrc, waveFilter, waveGain, waveLFO, waveLFOG);
+
+  // 심해 저음 드론
+  const d1 = makeDrone(30,  'sine', 0.18); d1.g.connect(rev);
+  const d2 = makeDrone(45,  'sine', 0.10); d2.g.connect(rev);
+  const d3 = makeDrone(60,  'sine', 0.07); d3.g.connect(rev);
+  makeLFO(0.012, 4, d1.osc.frequency);
+  makeLFO(0.018, 3, d2.osc.frequency, 1);
+
+  // 고래 소리: 느린 주파수 글라이드
+  audioLoop(t => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type='sine';
+    const startF=80+Math.random()*60, endF=120+Math.random()*100;
+    osc.frequency.setValueAtTime(startF,t);
+    osc.frequency.linearRampToValueAtTime(endF,t+4);
+    osc.frequency.linearRampToValueAtTime(startF*0.8,t+8);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.12,t+1.5);
+    g.gain.exponentialRampToValueAtTime(0.001,t+10);
+    osc.connect(g); g.connect(rev); osc.start(t); osc.stop(t+11); musicNodes.push(osc,g);
+  }, 16);
+}
+
+/* ── Wind Chime ──────────────────────────────────────────────
+   바람에 흔들리는 풍경 소리 + 맑은 공기감
+   가볍고 청아한 느낌
+─────────────────────────────────────────────────────────── */
+function playChime() {
+  const rev = makeReverb(4, 0.7);
+
+  // 바람 노이즈 (매우 부드럽게)
+  const bufLen = audioCtx.sampleRate * 2;
+  const windBuf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+  const wd = windBuf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) wd[i] = (Math.random()*2-1);
+  const windSrc = audioCtx.createBufferSource();
+  windSrc.buffer = windBuf; windSrc.loop = true;
+  const windFilter = audioCtx.createBiquadFilter();
+  windFilter.type = 'bandpass'; windFilter.frequency.value = 600; windFilter.Q.value = 0.3;
+  const windGain = audioCtx.createGain(); windGain.gain.value = 0.025;
+  windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(rev);
+  windSrc.start(); musicNodes.push(windSrc, windFilter, windGain);
+
+  // 풍경 음들: 펜타토닉 고음
+  const chimeNotes = [523.2, 587.3, 659.3, 783.9, 880, 1046.5, 1174.7, 1318.5];
+  audioLoop(t => {
+    const f = chimeNotes[Math.floor(Math.random()*chimeNotes.length)];
+    schedNote(f,   t,      3+Math.random()*3, 0.06+Math.random()*0.04, rev);
+    schedNote(f*2, t+0.01, 2+Math.random()*2, 0.025, rev);
+  }, 1.5);
+
+  // 받침 드론 (아주 부드럽게)
+  const base = makeDrone(261.6, 'sine', 0.04); base.g.connect(rev);
+  makeLFO(0.025, 1.5, base.osc.frequency);
+}
+
+/* ── Pure Crystal ────────────────────────────────────────────
+   유리를 두드리는 듯한 극도로 맑고 투명한 크리스탈 사운드
+   배음이 풍부한 순수한 유리 공명
+─────────────────────────────────────────────────────────── */
+function playPureCrystal() {
+  const rev = makeReverb(6, 0.82);
+
+  // 극히 맑은 기저 드론 — 순수 사인파 3도 화음
+  const base1 = makeDrone(261.6, 'sine', 0.06);  base1.g.connect(rev); // C4
+  const base2 = makeDrone(329.6, 'sine', 0.045); base2.g.connect(rev); // E4
+  const base3 = makeDrone(392.0, 'sine', 0.035); base3.g.connect(rev); // G4
+  makeLFO(0.008, 0.8, base1.osc.frequency);
+  makeLFO(0.010, 0.6, base2.osc.frequency, 1.2);
+  makeLFO(0.007, 0.5, base3.osc.frequency, 2.4);
+
+  // 크리스탈 타격음: 피치와 배음이 극히 맑게 울림
+  const crystalFreqs = [523.2, 587.3, 659.3, 698.5, 783.9, 880, 987.8, 1046.5, 1174.7, 1318.5];
+  audioLoop(t => {
+    const f = crystalFreqs[Math.floor(Math.random() * crystalFreqs.length)];
+    const dur = 5 + Math.random() * 5;
+    // 기본음: 어택은 거의 즉시, 매우 긴 릴리즈
+    schedNote(f,     t,       dur,   0.08, rev);
+    schedNote(f*2,   t+0.002, dur*0.7, 0.035, rev); // 2배음
+    schedNote(f*3,   t+0.004, dur*0.5, 0.018, rev); // 3배음
+    schedNote(f*4.2, t+0.006, dur*0.35,0.009, rev); // 비화음 배음 → 유리 특유의 냉랭함
+  }, 4);
+
+  const shimmer = [2093, 2349, 2637, 3136, 3520, 4186];
+  audioLoop(t => {
+    schedNote(shimmer[Math.floor(Math.random()*shimmer.length)], t, 2+Math.random()*2, 0.018, rev);
+  }, 5);
+
+  // 아주 느린 상승·하강 글리산도
+  audioLoop(t => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = 'sine';
+    const startF = 400 + Math.random() * 400;
+    const endF   = startF * (Math.random() < 0.5 ? 1.5 : 0.67);
+    const dur    = 6 + Math.random() * 6;
+    osc.frequency.setValueAtTime(startF, t);
+    osc.frequency.linearRampToValueAtTime(endF, t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.03, t + 0.5);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(g); g.connect(rev);
+    osc.start(t); osc.stop(t + dur + 0.1);
+    musicNodes.push(osc, g);
+  }, 8);
+}
+
+/* ── Space Opera ─────────────────────────────────────────────
+   영화 우주 오페라 같은 웅장하고 서사적인 사운드
+   현악 + 브라스 + 타악이 조화된 오케스트라 우주 음악
+─────────────────────────────────────────────────────────── */
+function playSpaceOpera() {
+  const rev = makeReverb(4, 0.65);
+
+  // 현악 패드 레이어: 톱니파 + 로우패스로 부드러운 현악 질감
+  function makeStrings(freq, gainVal, detuneVal) {
+    const osc  = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const filt = audioCtx.createBiquadFilter();
+    const g    = audioCtx.createGain();
+    osc.type='sawtooth'; osc.frequency.value=freq; osc.detune.value=detuneVal||0;
+    osc2.type='sawtooth'; osc2.frequency.value=freq*1.003; osc2.detune.value=-(detuneVal||0);
+    filt.type='lowpass'; filt.frequency.value=2000;
+    g.gain.setValueAtTime(0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime+5);
+    osc.connect(filt); osc2.connect(filt); filt.connect(g); g.connect(rev);
+    osc.start(); osc2.start();
+    musicNodes.push(osc, osc2, filt, g);
+    makeLFO(5.2, freq*0.003, osc.frequency);
+    return g;
+  }
+
+  // 현악 섹션 (Cm 웅장한 단조)
+  makeStrings(65.4,  0.10,  5);   // C2 베이스
+  makeStrings(130.8, 0.09, -4);   // C3
+  makeStrings(155.6, 0.08,  6);   // Eb3
+  makeStrings(196.0, 0.07, -3);   // G3
+  makeStrings(261.6, 0.06,  7);   // C4
+  makeStrings(311.1, 0.05, -5);   // Eb4
+
+  // 브라스 파트: 사각파로 금관악기 느낌
+  function makeBrass(freq, gainVal) {
+    const osc  = audioCtx.createOscillator();
+    const filt = audioCtx.createBiquadFilter();
+    const g    = audioCtx.createGain();
+    osc.type = 'square'; osc.frequency.value = freq;
+    filt.type = 'lowpass'; filt.frequency.value = 1500;
+    g.gain.setValueAtTime(0, audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(gainVal, audioCtx.currentTime+6);
+    osc.connect(filt); filt.connect(g); g.connect(rev);
+    osc.start(); musicNodes.push(osc, filt, g);
+    return g;
+  }
+  makeBrass(65.4,  0.045);
+  makeBrass(98.0,  0.035);
+  makeBrass(130.8, 0.025);
+
+  // 웅장한 멜로디 테마: 느린 영화음악 스타일
+  const heroTheme = [
+    [196,3],[220,1],[196,2],[155.6,4],
+    [174.6,3],[196,1],[220,2],[261.6,4],
+    [311.1,3],[261.6,1],[220,2],[196,6],
+  ];
+  let themeIdx = 0;
+  function playTheme() {
+    if (themeIdx >= heroTheme.length) themeIdx = 0;
+    const [f, beats] = heroTheme[themeIdx++];
+    const dur = beats * 0.9;
+    schedNote(f,   audioCtx.currentTime, dur, 0.07, rev);
+    schedNote(f*2, audioCtx.currentTime, dur*0.8, 0.03, rev); // 옥타브 강화
+    setTimeout(playTheme, beats * 900); // theme uses sequential timing - keep
+  }
+  setTimeout(playTheme, 3000);
+
+  // 타악 강조: 웅장한 팀파니 느낌
+  audioLoop(t => {
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = 'sine';
+    const f = [65.4, 98, 130.8][Math.floor(Math.random()*3)];
+    osc.frequency.setValueAtTime(f, t);
+    osc.frequency.exponentialRampToValueAtTime(f*0.7, t+0.8);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t+2.5);
+    osc.connect(g); g.connect(rev);
+    osc.start(t); osc.stop(t+3);
+    musicNodes.push(osc, g);
+  }, 10);
+
+  // 우주적 신시사이저 스윕
+  const synth1 = makeDrone(32.7, 'sine', 0.12); synth1.g.connect(rev);
+  const synth2 = makeDrone(49.0, 'sine', 0.08); synth2.g.connect(rev);
+  makeLFO(0.03, 5, synth1.osc.frequency);
+  makeLFO(0.02, 4, synth2.osc.frequency, 1.5);
+}
+
+// 음악 전환: 기존 노드 정리 후 선택된 타입 재생
+function startMusic(type) {
+  stopMusic();
+  if      (type === 'universe')     playUniverse();
+  else if (type === 'space')        playSpaceAmbient();
+  else if (type === 'calm')         playCalming();
+  else if (type === 'rain')         playRain();
+  else if (type === 'crystal')      playCrystal();
+  else if (type === 'dream')        playDream();
+  else if (type === 'ocean')        playOcean();
+  else if (type === 'chime')        playChime();
+  else if (type === 'pure_crystal') playPureCrystal();
+  else if (type === 'opera')        playSpaceOpera();
+}
+
+/* ───────────────────────────────────────────────────────────
+   9. 이벤트 핸들러
+─────────────────────────────────────────────────────────── */
+
+// 모드 변경: 인덱스 업데이트 + 세그먼트 수 변경 + 레이블 텍스트 변경
+document.getElementById('sel-mode').onchange = function(){
+  currentMode  = parseInt(this.value);
+  // 모바일은 세그먼트 수를 절반으로 줄여 draw() 호출 감소
+  const segTable = isMobile
+    ? [6,4,8,6,4, 6,8,6,4,8,8,8,6]   // 모바일용 (절반)
+    : [12,8,16,10,6, 14,18,12,6,20,24,16,10]; // 데스크탑용
+  segmentCount = segTable[currentMode];
+  document.getElementById('kc-label').textContent = MODES[currentMode].toUpperCase();
+};
+
+// 팔레트 변경: 기존 파티클 색상도 즉시 새 팔레트로 갱신
+document.getElementById('sel-palette').onchange = function(){
+  currentPalette = parseInt(this.value);
+  particles.forEach(p => p.color = palette()[Math.floor(Math.random()*palette().length)]);
+};
+
+// 속도 변경: speedMultiplier만 바꾸면 update/rotSpeed 계산에 자동 반영
+document.getElementById('sel-speed').onchange = function(){
+  speedMultiplier = parseFloat(this.value);
+};
+
+// 음악 변경: 선택된 타입으로 즉시 전환
+document.getElementById('sel-music').onchange = function(){
+  startMusic(this.value);
+};
+
+// 사이메틱스 패턴 선택
+document.getElementById('sel-cymatics').onchange = function(){
+  cymaticsType = parseInt(this.value);
+};
+
+// 볼륨 슬라이더: masterGain의 gain 값을 부드럽게 변경 (0.1초 타임 상수)
+document.getElementById('vol-slider').oninput = function(){
+  if (masterGain) masterGain.gain.setTargetAtTime(this.value/100, audioCtx.currentTime, 0.1);
+};
+
+// 잔상 슬라이더: 1(매우 긺)~40(짧음) → 100으로 나눠 trail 값으로 사용
+let trailValue = 0.18;
+document.getElementById('trail-slider').oninput = function(){
+  trailValue = parseInt(this.value) / 100;
+};
+
+// BURST 버튼: 파티클 폭발 + 줌 임의 변경 + 물결 즉시 발동
+document.getElementById('btn-burst').onclick = function(){
+  burstTimer = 60; // 60프레임 동안 빠른 속도 유지
+  const pal = palette();
+  particles.forEach(p => {
+    p.color = pal[Math.floor(Math.random()*pal.length)]; // 색 변경
+    p.vx = (Math.random()-0.5)*8; // 폭발적 속도 부여
+    p.vy = (Math.random()-0.5)*8;
+    p.life = 1.0; // 수명 리셋
+  });
+  targetScale   = 0.7 + Math.random() * 0.9; // 줌 새 목표 설정
+  zoomVelocity += (Math.random()-0.5) * 0.03; // 줌 속도에 미세 충격
+  triggerRipple(); // 물결 효과 즉시 발동
+};
+
+// 시작 오버레이 클릭: 오버레이 숨기고 AudioContext 초기화 + 음악 시작
+document.getElementById('start-overlay').addEventListener('click', function(){
+  // 오버레이를 먼저 완전히 제거 (에러가 나도 화면은 반드시 넘어감)
+  this.remove();
+  try {
+    initAudio();
+    startMusic(document.getElementById('sel-music').value);
+  } catch(e) {
+    console.warn('Audio init failed:', e);
+  }
+});
+
+/* ───────────────────────────────────────────────────────────
+   10. 초기화 & 렌더 루프
+─────────────────────────────────────────────────────────── */
+// DOM 레이아웃이 완전히 완료된 후 resize → visH가 올바르게 측정됨
+setTimeout(() => {
+  resize();
+  for (let i = 0; i < (isMobile ? 35 : 60); i++) particles.push(new Particle());
+  requestAnimationFrame(render);
+}, 0);
+window.addEventListener('resize', resize);
+
+// 모바일 감지: 스마트폰이면 성능 제한 모드
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                 (window.innerWidth <= 768 && 'ontouchstart' in window);
+
+let lastTime = 0; // deltaTime 계산용
+
+function render(timestamp) {
+  // ── deltaTime 기반 시간 계산 (기기 성능과 무관하게 일정한 속도 유지) ──
+  if (!lastTime) lastTime = timestamp;
+  const delta = Math.min((timestamp - lastTime) / 1000, 0.05); // 최대 0.05초 클램프
+  lastTime = timestamp;
+  time += delta;                         // 고정 0.016 대신 실제 경과시간 사용
+
+  if (burstTimer > 0) burstTimer--;
+  updateZoom();
+  updateWaves();
+
+  // 잔상 효과: trailValue가 작을수록 이전 프레임이 천천히 지워져 잔상이 길게 남음
+  ctx.fillStyle = `rgba(0,0,0,${trailValue})`;
+  ctx.fillRect(0, 0, W, H);
+
+  // 불규칙한 회전 속도: 3가지 사인파를 조합해 유기적인 움직임
+  const t = Date.now() * 0.001;
+  const rotSpeed = (
+    Math.sin(t*0.3)*0.015 +               // 느린 물결
+    Math.sin(t*0.7+1.2)*0.025 +           // 중간 물결
+    Math.sin(t*2.5)*Math.cos(t*1.1)*0.012 // 빠른 잡음
+    + (burstTimer>0 ? 0.08 : 0)           // BURST 추가 회전
+  ) * speedMultiplier;
+  globalRot += rotSpeed; // 누적 회전각 업데이트
+
+  ctx.save();
+  ctx.translate(centerX, centerY); // 메뉴 제외 영역의 정중앙으로 이동
+  ctx.scale(currentScale, currentScale); // 줌 스케일 적용
+
+  drawModeEffect();     // 모드별 배경 효과 (회전 전에 그려 배경처럼 보임)
+  ctx.rotate(globalRot); // 만화경 전체 회전
+  drawRings();           // 동심원 링
+  drawWaves();
+  drawCymatics(); // 사이메틱스 오버레이 (ON일 때만 그려짐)           // 물결/썰물 파동
+
+  // ─ 만화경 대칭 렌더링 ─
+  // segmentCount개의 조각으로 나누어 파티클을 반복 그림
+  const slice = (Math.PI*2) / segmentCount; // 한 조각의 각도
+  for (let i = 0; i < segmentCount; i++) {
+    ctx.rotate(slice);                                   // 해당 조각 각도로 회전
+    particles.forEach(p => p.draw(ctx));                 // 정방향 파티클
+    ctx.save();
+    ctx.scale(1, -1);                                    // Y축 반전 (거울 대칭)
+    particles.forEach(p => p.draw(ctx));                 // 반전된 파티클
+    ctx.restore();
+  }
+
+  drawCore();    // 중앙 발광 핵 (파티클 위에 그려 항상 맨 위)
+  ctx.restore(); // translate/scale/rotate 전부 복원
+
+  particles.forEach(p => p.update());
+  requestAnimationFrame(render);        // 다음 프레임 요청 (브라우저 60fps 루프)
+}
+
+// render()는 위의 setTimeout 블록 안에서 호출됨
+
+})(); // IIFE 종료
+</script>
+</body>
+</html>
