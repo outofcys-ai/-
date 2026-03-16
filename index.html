@@ -1826,27 +1826,42 @@ function startMusic(type) {
       }
     });
 
-    // 항목 클릭 → 값 반영, 버튼 텍스트 갱신, 닫기
+    // 항목 선택 공통 처리 함수
+    function selectItem(item, e) {
+      e.stopPropagation();
+      e.preventDefault();
+      const val   = item.dataset.value;
+      const label = item.textContent.trim();
+      const valSpan = btn.querySelector('.btn-value');
+      if (valSpan) valSpan.textContent = label;
+      else btn.textContent = label;
+      btn.dataset.value = val;
+      drop.querySelectorAll('.kdropdown-item').forEach(i => i.classList.remove('selected'));
+      item.classList.add('selected');
+      closeAll();
+      onChange(val);
+    }
+
     drop.querySelectorAll('.kdropdown-item').forEach(item => {
+      // 모바일: touchend로 처리 (touchstart의 closeAll보다 늦게 발생하지 않도록)
+      item.addEventListener('touchend', function(e) { selectItem(this, e); }, { passive: false });
+      // 데스크탑: click으로 처리
       item.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const val   = this.dataset.value;
-        const label = this.textContent;
-        const valSpan = btn.querySelector('.btn-value');
-        if (valSpan) valSpan.textContent = label;
-        else btn.textContent = label;
-        btn.dataset.value = val;
-        drop.querySelectorAll('.kdropdown-item').forEach(i => i.classList.remove('selected'));
-        this.classList.add('selected');
-        closeAll();
-        onChange(val);
+        // touchend가 이미 처리했으면 중복 실행 방지
+        if (e.detail === 0) return; // touchend 후 발생하는 synthetic click 무시
+        selectItem(this, e);
       });
     });
   });
 
-  // 바깥 클릭 시 모두 닫기
-  document.addEventListener('click', closeAll);
-  document.addEventListener('touchstart', closeAll, { passive: true });
+  // 바깥 터치/클릭 시 모두 닫기 — 드롭다운 내부 터치는 제외
+  function outsideClose(e) {
+    if (!e.target.closest('.kdropdown') && !e.target.closest('.kselect-wrap')) {
+      closeAll();
+    }
+  }
+  document.addEventListener('click', outsideClose);
+  document.addEventListener('touchstart', outsideClose, { passive: true });
 })();
 
 // 볼륨 슬라이더: masterGain의 gain 값을 부드럽게 변경 (0.1초 타임 상수)
