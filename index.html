@@ -179,11 +179,11 @@
 
   <!-- 2행 -->
   <select class="kselect" id="sel-speed">
-    <option value="0.075">매우 느림</option>
-    <option value="0.15">느림</option>
-    <option value="0.25" selected>보통</option>
-    <option value="0.5">빠름</option>
-    <option value="0.75">매우 빠름</option>
+    <option value="0.015">매우 느림</option>
+    <option value="0.03">느림</option>
+    <option value="0.05" selected>보통</option>
+    <option value="0.1">빠름</option>
+    <option value="0.15">매우 빠름</option>
   </select>
 
   <select class="kselect" id="sel-music">
@@ -204,7 +204,7 @@
   <!-- 3행: 슬라이더 2개 + 빈칸 -->
   <div class="slider-wrap">
     <span class="slider-label">♪ 볼륨</span>
-    <input type="range" class="kslider" id="vol-slider" min="0" max="100" value="60">
+    <input type="range" class="kslider" id="vol-slider" min="0" max="100" value="90">
   </div>
 
   <div class="slider-wrap">
@@ -300,7 +300,7 @@ function resize() {
    segmentCount: 만화경 대칭 조각 수
 ─────────────────────────────────────────────────────────── */
 let time = 0, globalRot = 0;
-let speedMultiplier = 0.25, burstTimer = 0;
+let speedMultiplier = 0.05, burstTimer = 0;
 let currentMode = 0, segmentCount = 12;
 
 /* ───────────────────────────────────────────────────────────
@@ -1089,7 +1089,7 @@ let musicNodes = [];
 function initAudio() {
   audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
   masterGain = audioCtx.createGain();
-  masterGain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+  masterGain.gain.setValueAtTime(0.9, audioCtx.currentTime);
   masterGain.connect(audioCtx.destination); // 스피커 출력에 연결
 }
 
