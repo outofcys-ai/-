@@ -27,13 +27,17 @@
       grid-template-columns: repeat(3, 1fr);
       gap: 5px;
       padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-      background: rgba(0,0,0,0.82);
+      background: transparent;
       border-top: 1px solid rgba(255,255,255,0.08);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
     }
 
-    /* 셀렉트 박스 */
+    /* 커스텀 셀렉트 래퍼 */
+    .kselect-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    /* 커스텀 셀렉트 버튼 */
     .kselect {
       width: 100%;
       background: rgba(255,255,255,0.07);
@@ -43,13 +47,49 @@
       border-radius: 10px;
       font-size: 11px;
       font-family: monospace;
-      appearance: none; -webkit-appearance: none;
       outline: none;
       text-align: center;
       cursor: pointer;
       min-height: 34px;
+      appearance: none; -webkit-appearance: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
-    .kselect option { background: #111; color: #fff; }
+
+    /* 커스텀 드롭다운 목록 */
+    .kdropdown {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      z-index: 100;
+      overflow: hidden;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .kdropdown.open { display: block; }
+    .kdropdown::-webkit-scrollbar { width: 3px; }
+    .kdropdown::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+    .kdropdown-item {
+      padding: 8px 4px;
+      font-size: 11px;
+      font-family: monospace;
+      color: rgba(255,255,255,0.85);
+      text-align: center;
+      cursor: pointer;
+      transition: background 0.1s;
+      background: rgba(0,0,0,0.15);
+    }
+    .kdropdown-item:hover,
+    .kdropdown-item:active { background: rgba(255,255,255,0.2); }
+    .kdropdown-item.selected { color: #fff; background: rgba(255,255,255,0.15); }
 
     /* 슬라이더 래퍼: 레이블 + 슬라이더를 세로로 */
     .slider-wrap {
@@ -131,73 +171,88 @@
 <div id="kc-ui">
 
   <!-- 1행 -->
-  <select class="kselect" id="sel-mode">
-    <option value="0">CLASSIC</option>
-    <option value="1">SPIRAL</option>
-    <option value="2">AURORA</option>
-    <option value="3">CRYSTAL</option>
-    <option value="4">NOVA</option>
-    <option value="5">FLOWER</option>
-    <option value="6">WEB</option>
-    <option value="7">PULSE</option>
-    <option value="8">VORTEX</option>
-    <option value="9">PRISM</option>
-    <option value="10">GALAXY</option>
-    <option value="11">RIPPLE</option>
-    <option value="12">FRACTAL</option>
-  </select>
+  <div class="kselect-wrap">
+    <button class="kselect" id="sel-mode" data-value="0">CLASSIC</button>
+    <div class="kdropdown" id="drop-mode">
+      <div class="kdropdown-item selected" data-value="0">CLASSIC</div>
+      <div class="kdropdown-item" data-value="1">SPIRAL</div>
+      <div class="kdropdown-item" data-value="2">AURORA</div>
+      <div class="kdropdown-item" data-value="3">CRYSTAL</div>
+      <div class="kdropdown-item" data-value="4">NOVA</div>
+      <div class="kdropdown-item" data-value="5">FLOWER</div>
+      <div class="kdropdown-item" data-value="6">WEB</div>
+      <div class="kdropdown-item" data-value="7">PULSE</div>
+      <div class="kdropdown-item" data-value="8">VORTEX</div>
+      <div class="kdropdown-item" data-value="9">PRISM</div>
+      <div class="kdropdown-item" data-value="10">GALAXY</div>
+      <div class="kdropdown-item" data-value="11">RIPPLE</div>
+      <div class="kdropdown-item" data-value="12">FRACTAL</div>
+    </div>
+  </div>
 
-  <select class="kselect" id="sel-cymatics">
-    <option value="-1">사이메틱스 OFF</option>
-    <option value="0">Chladni 기본</option>
-    <option value="1">원형 파동</option>
-    <option value="2">별형 공명</option>
-    <option value="3">격자 간섭</option>
-    <option value="4">리사주 망</option>
-    <option value="5">만다라 파동</option>
-    <option value="6">베셀 함수</option>
-    <option value="7">나선 정상파</option>
-  </select>
+  <div class="kselect-wrap">
+    <button class="kselect" id="sel-cymatics" data-value="-1">사이메틱스 OFF</button>
+    <div class="kdropdown" id="drop-cymatics">
+      <div class="kdropdown-item selected" data-value="-1">사이메틱스 OFF</div>
+      <div class="kdropdown-item" data-value="0">Chladni 기본</div>
+      <div class="kdropdown-item" data-value="1">원형 파동</div>
+      <div class="kdropdown-item" data-value="2">별형 공명</div>
+      <div class="kdropdown-item" data-value="3">격자 간섭</div>
+      <div class="kdropdown-item" data-value="4">리사주 망</div>
+      <div class="kdropdown-item" data-value="5">만다라 파동</div>
+      <div class="kdropdown-item" data-value="6">베셀 함수</div>
+      <div class="kdropdown-item" data-value="7">나선 정상파</div>
+    </div>
+  </div>
 
-  <select class="kselect" id="sel-palette">
-    <option value="0">네온 사이버</option>
-    <option value="1">오로라</option>
-    <option value="2">황금 불꽃</option>
-    <option value="3">딥 오션</option>
-    <option value="4">벚꽃</option>
-    <option value="5">레인보우</option>
-    <option value="6">용암</option>
-    <option value="7">에메랄드</option>
-    <option value="8">갤럭시</option>
-    <option value="9">선셋</option>
-    <option value="10">아이스</option>
-    <option value="11">독성</option>
-    <option value="12">로즈골드</option>
-    <option value="13">미드나이트</option>
-    <option value="14">캔디</option>
-  </select>
+  <div class="kselect-wrap">
+    <button class="kselect" id="sel-palette" data-value="0">네온 사이버</button>
+    <div class="kdropdown" id="drop-palette">
+      <div class="kdropdown-item selected" data-value="0">네온 사이버</div>
+      <div class="kdropdown-item" data-value="1">오로라</div>
+      <div class="kdropdown-item" data-value="2">황금 불꽃</div>
+      <div class="kdropdown-item" data-value="3">딥 오션</div>
+      <div class="kdropdown-item" data-value="4">벚꽃</div>
+      <div class="kdropdown-item" data-value="5">레인보우</div>
+      <div class="kdropdown-item" data-value="6">용암</div>
+      <div class="kdropdown-item" data-value="7">에메랄드</div>
+      <div class="kdropdown-item" data-value="8">갤럭시</div>
+      <div class="kdropdown-item" data-value="9">선셋</div>
+      <div class="kdropdown-item" data-value="10">아이스</div>
+      <div class="kdropdown-item" data-value="11">독성</div>
+      <div class="kdropdown-item" data-value="12">로즈골드</div>
+      <div class="kdropdown-item" data-value="13">미드나이트</div>
+      <div class="kdropdown-item" data-value="14">캔디</div>
+    </div>
+  </div>
 
   <!-- 2행 -->
-  <select class="kselect" id="sel-speed">
-    <option value="0.015">매우 느림</option>
-    <option value="0.03">느림</option>
-    <option value="0.05" selected>보통</option>
-    <option value="0.1">빠름</option>
-    <option value="0.15">매우 빠름</option>
-  </select>
+  <div class="kselect-wrap">
+    <button class="kselect" id="sel-speed" data-value="0.05">보통</button>
+    <div class="kdropdown" id="drop-speed">
+      <div class="kdropdown-item" data-value="0.015">매우 느림</div>
+      <div class="kdropdown-item" data-value="0.03">느림</div>
+      <div class="kdropdown-item selected" data-value="0.05">보통</div>
+      <div class="kdropdown-item" data-value="0.1">빠름</div>
+      <div class="kdropdown-item" data-value="0.15">매우 빠름</div>
+    </div>
+  </div>
 
-  <select class="kselect" id="sel-music">
-    <option value="universe">Universe</option>
-    <option value="space">Space Ambient</option>
-    <option value="calm" selected>Calming</option>
-    <option value="rain">Rain Forest</option>
-    <option value="crystal">Crystal Bowl</option>
-    <option value="dream">Dreamscape</option>
-    <option value="ocean">Deep Ocean</option>
-    <option value="chime">Wind Chime</option>
-    <option value="pure_crystal">맑은 크리스탈</option>
-    <option value="opera">Space Opera</option>
-  </select>
+  <div class="kselect-wrap">
+    <button class="kselect" id="sel-music" data-value="calm">Calming</button>
+    <div class="kdropdown" id="drop-music">
+      <div class="kdropdown-item" data-value="universe">Universe</div>
+      <div class="kdropdown-item" data-value="space">Space Ambient</div>
+      <div class="kdropdown-item selected" data-value="calm">Calming</div>
+      <div class="kdropdown-item" data-value="rain">Rain Forest</div>
+      <div class="kdropdown-item" data-value="crystal">Crystal Bowl</div>
+      <div class="kdropdown-item" data-value="dream">Dreamscape</div>
+      <div class="kdropdown-item" data-value="ocean">Deep Ocean</div>
+      <div class="kdropdown-item" data-value="chime">Wind Chime</div>
+      <div class="kdropdown-item" data-value="pure_crystal">맑은 크리스탈</div>
+      <div class="kdropdown-item" data-value="opera">Space Opera</div>
+    </div>
+  </div>
 
   <button id="btn-burst">✦ BURST</button>
 
@@ -1668,37 +1723,83 @@ function startMusic(type) {
    9. 이벤트 핸들러
 ─────────────────────────────────────────────────────────── */
 
-// 모드 변경: 인덱스 업데이트 + 세그먼트 수 변경 + 레이블 텍스트 변경
-document.getElementById('sel-mode').onchange = function(){
-  currentMode  = parseInt(this.value);
-  // 모바일은 세그먼트 수를 절반으로 줄여 draw() 호출 감소
-  const segTable = isMobile
-    ? [6,4,8,6,4, 6,8,6,4,8,8,8,6]   // 모바일용 (절반)
-    : [12,8,16,10,6, 14,18,12,6,20,24,16,10]; // 데스크탑용
-  segmentCount = segTable[currentMode];
-  document.getElementById('kc-label').textContent = MODES[currentMode].toUpperCase();
-};
+// ── 커스텀 드롭다운 공통 로직 ──
+(function initDropdowns() {
+  const configs = [
+    {
+      btnId: 'sel-mode',
+      dropId: 'drop-mode',
+      onChange(val) {
+        currentMode = parseInt(val);
+        const segTable = isMobile
+          ? [6,4,8,6,4, 6,8,6,4,8,8,8,6]
+          : [12,8,16,10,6, 14,18,12,6,20,24,16,10];
+        segmentCount = segTable[currentMode];
+        document.getElementById('kc-label').textContent = MODES[currentMode].toUpperCase();
+      }
+    },
+    {
+      btnId: 'sel-cymatics',
+      dropId: 'drop-cymatics',
+      onChange(val) { cymaticsType = parseInt(val); }
+    },
+    {
+      btnId: 'sel-palette',
+      dropId: 'drop-palette',
+      onChange(val) {
+        currentPalette = parseInt(val);
+        particles.forEach(p => p.color = palette()[Math.floor(Math.random()*palette().length)]);
+      }
+    },
+    {
+      btnId: 'sel-speed',
+      dropId: 'drop-speed',
+      onChange(val) { speedMultiplier = parseFloat(val); }
+    },
+    {
+      btnId: 'sel-music',
+      dropId: 'drop-music',
+      onChange(val) { startMusic(val); }
+    }
+  ];
 
-// 팔레트 변경: 기존 파티클 색상도 즉시 새 팔레트로 갱신
-document.getElementById('sel-palette').onchange = function(){
-  currentPalette = parseInt(this.value);
-  particles.forEach(p => p.color = palette()[Math.floor(Math.random()*palette().length)]);
-};
+  function closeAll() {
+    document.querySelectorAll('.kdropdown').forEach(d => d.classList.remove('open'));
+  }
 
-// 속도 변경: speedMultiplier만 바꾸면 update/rotSpeed 계산에 자동 반영
-document.getElementById('sel-speed').onchange = function(){
-  speedMultiplier = parseFloat(this.value);
-};
+  configs.forEach(({ btnId, dropId, onChange }) => {
+    const btn  = document.getElementById(btnId);
+    const drop = document.getElementById(dropId);
+    if (!btn || !drop) return;
 
-// 음악 변경: 선택된 타입으로 즉시 전환
-document.getElementById('sel-music').onchange = function(){
-  startMusic(this.value);
-};
+    // 버튼 클릭 → 해당 드롭다운 토글, 나머지 닫기
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const wasOpen = drop.classList.contains('open');
+      closeAll();
+      if (!wasOpen) drop.classList.add('open');
+    });
 
-// 사이메틱스 패턴 선택
-document.getElementById('sel-cymatics').onchange = function(){
-  cymaticsType = parseInt(this.value);
-};
+    // 항목 클릭 → 값 반영, 버튼 텍스트 갱신, 닫기
+    drop.querySelectorAll('.kdropdown-item').forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const val   = this.dataset.value;
+        const label = this.textContent;
+        btn.textContent  = label;
+        btn.dataset.value = val;
+        drop.querySelectorAll('.kdropdown-item').forEach(i => i.classList.remove('selected'));
+        this.classList.add('selected');
+        closeAll();
+        onChange(val);
+      });
+    });
+  });
+
+  // 바깥 클릭 시 모두 닫기
+  document.addEventListener('click', closeAll);
+  document.addEventListener('touchstart', closeAll, { passive: true });
+})();
 
 // 볼륨 슬라이더: masterGain의 gain 값을 부드럽게 변경 (0.1초 타임 상수)
 document.getElementById('vol-slider').oninput = function(){
@@ -1732,7 +1833,7 @@ document.getElementById('start-overlay').addEventListener('click', function(){
   this.remove();
   try {
     initAudio();
-    startMusic(document.getElementById('sel-music').value);
+    startMusic(document.getElementById('sel-music').dataset.value);
   } catch(e) {
     console.warn('Audio init failed:', e);
   }
